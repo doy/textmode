@@ -1,5 +1,7 @@
+use textmode::Textmode as _;
+
 fn main() {
-    let mut tm = textmode::Textmode::new().unwrap();
+    let mut tm = textmode::sync::Textmode::new().unwrap();
 
     tm.move_to(5, 5);
     tm.write_str("foo");
