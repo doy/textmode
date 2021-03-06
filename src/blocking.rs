@@ -25,7 +25,7 @@ impl super::private::TextmodeImpl for Textmode {
     }
 }
 
-impl super::Textmode for Textmode {}
+impl super::TextmodeExt for Textmode {}
 
 impl Textmode {
     pub fn new() -> std::io::Result<Self> {

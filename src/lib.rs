@@ -1,8 +1,11 @@
 pub mod color;
 
+pub mod blocking;
+
 #[cfg(feature = "async")]
 pub mod r#async;
-pub mod sync;
+#[cfg(feature = "async")]
+pub use r#async::Textmode;
 
 mod private {
     pub trait TextmodeImpl {
@@ -23,7 +26,7 @@ mod private {
     }
 }
 
-pub trait Textmode: private::TextmodeImpl {
+pub trait TextmodeExt: private::TextmodeImpl {
     fn cursor_position(&self) -> (u16, u16) {
         self.next().screen().cursor_position()
     }

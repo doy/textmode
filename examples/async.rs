@@ -1,4 +1,4 @@
-use textmode::Textmode as _;
+use textmode::TextmodeExt as _;
 
 async fn run(tm: &mut textmode::r#async::Textmode) -> std::io::Result<()> {
     tm.move_to(5, 5);
