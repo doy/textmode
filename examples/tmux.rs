@@ -255,6 +255,8 @@ impl State {
         tm.clear();
         let new_screen = window.vt.lock_arc().await.screen().clone();
         tm.write(&new_screen.contents_formatted());
+        tm.write(&new_screen.input_mode_formatted());
+        tm.write(&new_screen.title_formatted());
         self.draw_notifications(tm, &new_screen);
         tm.refresh().await.unwrap();
     }
@@ -263,9 +265,15 @@ impl State {
         let window = self.current_window();
         let old_screen = window.screen.clone();
         let new_screen = window.vt.lock_arc().await.screen().clone();
-        let diff = new_screen.contents_diff(&old_screen);
+        let contents_diff = new_screen.contents_diff(&old_screen);
+        let input_mode_diff = new_screen.input_mode_diff(&old_screen);
+        let title_diff = new_screen.title_diff(&old_screen);
+        let bells_diff = new_screen.bells_diff(&old_screen);
         self.clear_notifications(tm, &old_screen);
-        tm.write(&diff);
+        tm.write(&contents_diff);
+        tm.write(&input_mode_diff);
+        tm.write(&title_diff);
+        tm.write(&bells_diff);
         self.draw_notifications(tm, &new_screen);
         tm.refresh().await.unwrap();
         self.current_window_mut().screen = new_screen;
