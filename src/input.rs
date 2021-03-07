@@ -79,15 +79,39 @@ impl Key {
     }
 }
 
-#[derive(Clone)]
-pub struct Input {
+pub struct RawGuard {
     termios: nix::sys::termios::Termios,
+    cleaned_up: bool,
+}
+
+impl RawGuard {
+    pub fn cleanup(&mut self) {
+        if self.cleaned_up {
+            return;
+        }
+        self.cleaned_up = true;
+        let stdin = std::io::stdin().as_raw_fd();
+        let _ = nix::sys::termios::tcsetattr(
+            stdin,
+            nix::sys::termios::SetArg::TCSANOW,
+            &self.termios,
+        );
+    }
+}
+
+impl Drop for RawGuard {
+    fn drop(&mut self) {
+        self.cleanup();
+    }
+}
+
+pub struct Input {
     buf: Vec<u8>,
 }
 
 #[allow(clippy::new_without_default)]
 impl Input {
-    pub fn new() -> Self {
+    pub fn new() -> (Self, RawGuard) {
         let stdin = std::io::stdin().as_raw_fd();
         let termios = nix::sys::termios::tcgetattr(stdin).unwrap();
         let mut termios_raw = termios.clone();
@@ -98,8 +122,17 @@ impl Input {
             &termios_raw,
         )
         .unwrap();
+        (
+            Self::new_without_raw(),
+            RawGuard {
+                termios,
+                cleaned_up: false,
+            },
+        )
+    }
+
+    pub fn new_without_raw() -> Self {
         Self {
-            termios,
             buf: Vec::with_capacity(4096),
         }
     }
@@ -118,15 +151,6 @@ impl Input {
 
     pub fn read_key_char(&mut self) -> std::io::Result<Option<Key>> {
         self.real_read_key(false, true)
-    }
-
-    pub fn cleanup(&mut self) {
-        let stdin = std::io::stdin().as_raw_fd();
-        let _ = nix::sys::termios::tcsetattr(
-            stdin,
-            nix::sys::termios::SetArg::TCSANOW,
-            &self.termios,
-        );
     }
 
     fn real_read_key(
@@ -387,11 +411,5 @@ impl Input {
 impl std::io::Read for Input {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         std::io::stdin().read(buf)
-    }
-}
-
-impl Drop for Input {
-    fn drop(&mut self) {
-        self.cleanup();
     }
 }

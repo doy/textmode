@@ -310,27 +310,37 @@ impl State {
 #[must_use]
 struct Tmux {
     input: textmode::Input,
+    _raw: textmode::RawGuard,
     tm: textmode::Output,
+    _screen: textmode::ScreenGuard,
     state: State,
 }
 
 impl Tmux {
     async fn new() -> Self {
-        let input = textmode::Input::new();
-        let tm = textmode::Output::new().await.unwrap();
+        let (input, _raw) = textmode::Input::new();
+        let (tm, _screen) = textmode::Output::new().await.unwrap();
         let state = State::new();
-        Self { input, tm, state }
+        Self {
+            input,
+            _raw,
+            tm,
+            _screen,
+            state,
+        }
     }
 
     async fn run(self, ex: &smol::Executor<'_>) {
         let Self {
-            mut input,
+            input,
+            _raw,
             mut tm,
+            _screen,
             mut state,
         } = self;
 
         state.new_window(ex, state.wevents.clone());
-        state.spawn_input_task(ex, input.clone());
+        state.spawn_input_task(ex, input);
 
         ex.run(async {
             loop {
@@ -391,9 +401,6 @@ impl Tmux {
             }
         })
         .await;
-
-        tm.cleanup().await.unwrap();
-        input.cleanup();
     }
 }
 

@@ -2,6 +2,26 @@ use std::io::Write as _;
 
 use super::private::TextmodeImpl as _;
 
+pub struct ScreenGuard {
+    cleaned_up: bool,
+}
+
+impl ScreenGuard {
+    pub fn cleanup(&mut self) -> std::io::Result<()> {
+        if self.cleaned_up {
+            return Ok(());
+        }
+        self.cleaned_up = true;
+        write_stdout(super::DEINIT)
+    }
+}
+
+impl Drop for ScreenGuard {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+
 pub struct Output {
     cur: vt100::Parser,
     next: vt100::Parser,
@@ -28,7 +48,15 @@ impl super::private::TextmodeImpl for Output {
 impl super::Textmode for Output {}
 
 impl Output {
-    pub fn new() -> std::io::Result<Self> {
+    pub fn new() -> std::io::Result<(Self, ScreenGuard)> {
+        write_stdout(super::INIT)?;
+        Ok((
+            Self::new_without_screen(),
+            ScreenGuard { cleaned_up: false },
+        ))
+    }
+
+    pub fn new_without_screen() -> Self {
         let (rows, cols) = match terminal_size::terminal_size() {
             Some((terminal_size::Width(w), terminal_size::Height(h))) => {
                 (h, w)
@@ -38,9 +66,7 @@ impl Output {
         let cur = vt100::Parser::new(rows, cols, 0);
         let next = vt100::Parser::new(rows, cols, 0);
 
-        let self_ = Self { cur, next };
-        self_.write_stdout(super::INIT)?;
-        Ok(self_)
+        Self { cur, next }
     }
 
     pub fn refresh(&mut self) -> std::io::Result<()> {
@@ -51,22 +77,16 @@ impl Output {
             self.next().screen().bells_diff(self.cur().screen()),
         ];
         for diff in diffs {
-            self.write_stdout(&diff)?;
+            write_stdout(&diff)?;
             self.cur_mut().process(&diff);
         }
         Ok(())
     }
-
-    fn write_stdout(&self, buf: &[u8]) -> std::io::Result<()> {
-        let mut stdout = std::io::stdout();
-        stdout.write_all(buf)?;
-        stdout.flush()?;
-        Ok(())
-    }
 }
 
-impl Drop for Output {
-    fn drop(&mut self) {
-        let _ = self.write_stdout(super::DEINIT);
-    }
+fn write_stdout(buf: &[u8]) -> std::io::Result<()> {
+    let mut stdout = std::io::stdout();
+    stdout.write_all(buf)?;
+    stdout.flush()?;
+    Ok(())
 }

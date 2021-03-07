@@ -1,7 +1,7 @@
 use textmode::Textmode as _;
 
 fn main() {
-    let mut tm = textmode::blocking::Output::new().unwrap();
+    let (mut tm, _guard) = textmode::blocking::Output::new().unwrap();
 
     tm.move_to(5, 5);
     tm.write_str("foo");

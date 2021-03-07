@@ -21,9 +21,9 @@ async fn run(tm: &mut textmode::r#async::Output) -> std::io::Result<()> {
 
 fn main() {
     smol::block_on(async {
-        let mut tm = textmode::r#async::Output::new().await.unwrap();
+        let (mut tm, _guard) =
+            textmode::r#async::Output::new().await.unwrap();
         let e = run(&mut tm).await;
-        tm.cleanup().await.unwrap();
         e.unwrap();
     });
 }

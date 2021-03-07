@@ -2,6 +2,28 @@ use futures_lite::io::AsyncWriteExt as _;
 
 use super::private::TextmodeImpl as _;
 
+pub struct ScreenGuard {
+    cleaned_up: bool,
+}
+
+impl ScreenGuard {
+    pub async fn cleanup(&mut self) -> std::io::Result<()> {
+        if self.cleaned_up {
+            return Ok(());
+        }
+        self.cleaned_up = true;
+        write_stdout(super::DEINIT).await
+    }
+}
+
+impl Drop for ScreenGuard {
+    fn drop(&mut self) {
+        futures_lite::future::block_on(async {
+            let _ = self.cleanup().await;
+        });
+    }
+}
+
 pub struct Output {
     cur: vt100::Parser,
     next: vt100::Parser,
@@ -28,7 +50,16 @@ impl super::private::TextmodeImpl for Output {
 impl super::Textmode for Output {}
 
 impl Output {
-    pub async fn new() -> std::io::Result<Self> {
+    pub async fn new() -> std::io::Result<(Self, ScreenGuard)> {
+        write_stdout(super::INIT).await?;
+
+        Ok((
+            Self::new_without_screen(),
+            ScreenGuard { cleaned_up: false },
+        ))
+    }
+
+    pub fn new_without_screen() -> Self {
         let (rows, cols) = match terminal_size::terminal_size() {
             Some((terminal_size::Width(w), terminal_size::Height(h))) => {
                 (h, w)
@@ -37,16 +68,7 @@ impl Output {
         };
         let cur = vt100::Parser::new(rows, cols, 0);
         let next = vt100::Parser::new(rows, cols, 0);
-
-        let self_ = Self { cur, next };
-        self_.write_stdout(super::INIT).await?;
-        Ok(self_)
-    }
-
-    // TODO: without async drop or async closures, i'm not sure how to do
-    // better than this
-    pub async fn cleanup(&mut self) -> std::io::Result<()> {
-        self.write_stdout(super::DEINIT).await
+        Self { cur, next }
     }
 
     pub async fn refresh(&mut self) -> std::io::Result<()> {
@@ -57,16 +79,16 @@ impl Output {
             self.next().screen().bells_diff(self.cur().screen()),
         ];
         for diff in diffs {
-            self.write_stdout(&diff).await?;
+            write_stdout(&diff).await?;
             self.cur_mut().process(&diff);
         }
         Ok(())
     }
+}
 
-    async fn write_stdout(&self, buf: &[u8]) -> std::io::Result<()> {
-        let mut stdout = blocking::Unblock::new(std::io::stdout());
-        stdout.write_all(buf).await?;
-        stdout.flush().await?;
-        Ok(())
-    }
+async fn write_stdout(buf: &[u8]) -> std::io::Result<()> {
+    let mut stdout = blocking::Unblock::new(std::io::stdout());
+    stdout.write_all(buf).await?;
+    stdout.flush().await?;
+    Ok(())
 }
