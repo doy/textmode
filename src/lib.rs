@@ -1,6 +1,10 @@
+#![allow(clippy::collapsible_if)]
+
 pub mod color;
 
 pub mod blocking;
+mod input;
+pub use input::{Input, Key};
 
 #[cfg(feature = "async")]
 pub mod r#async;

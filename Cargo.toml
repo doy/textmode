@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 itoa = "0.4"
+nix = "0.20"
 terminal_size = "0.1"
 vt100 = "0.11"
 
@@ -18,6 +19,5 @@ async = ["blocking", "futures-lite"]
 
 [dev-dependencies]
 libc = "0.2"
-nix = "0.20"
 pty-process = { version = "0.1", features = ["backend-smol"] }
 smol = "1.2"
