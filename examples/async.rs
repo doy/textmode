@@ -1,6 +1,6 @@
-use textmode::TextmodeExt as _;
+use textmode::Textmode as _;
 
-async fn run(tm: &mut textmode::r#async::Textmode) -> std::io::Result<()> {
+async fn run(tm: &mut textmode::r#async::Output) -> std::io::Result<()> {
     tm.move_to(5, 5);
     tm.write_str("foo");
     smol::Timer::after(std::time::Duration::from_secs(2)).await;
@@ -21,7 +21,7 @@ async fn run(tm: &mut textmode::r#async::Textmode) -> std::io::Result<()> {
 
 fn main() {
     smol::block_on(async {
-        let mut tm = textmode::r#async::Textmode::new().await.unwrap();
+        let mut tm = textmode::r#async::Output::new().await.unwrap();
         let e = run(&mut tm).await;
         tm.cleanup().await.unwrap();
         e.unwrap();

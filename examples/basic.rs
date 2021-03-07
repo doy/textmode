@@ -1,7 +1,7 @@
-use textmode::TextmodeExt as _;
+use textmode::Textmode as _;
 
 fn main() {
-    let mut tm = textmode::blocking::Textmode::new().unwrap();
+    let mut tm = textmode::blocking::Output::new().unwrap();
 
     tm.move_to(5, 5);
     tm.write_str("foo");

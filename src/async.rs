@@ -2,12 +2,12 @@ use futures_lite::io::AsyncWriteExt as _;
 
 use super::private::TextmodeImpl as _;
 
-pub struct Textmode {
+pub struct Output {
     cur: vt100::Parser,
     next: vt100::Parser,
 }
 
-impl super::private::TextmodeImpl for Textmode {
+impl super::private::TextmodeImpl for Output {
     fn cur(&self) -> &vt100::Parser {
         &self.cur
     }
@@ -25,9 +25,9 @@ impl super::private::TextmodeImpl for Textmode {
     }
 }
 
-impl super::TextmodeExt for Textmode {}
+impl super::Textmode for Output {}
 
-impl Textmode {
+impl Output {
     pub async fn new() -> std::io::Result<Self> {
         let (rows, cols) = match terminal_size::terminal_size() {
             Some((terminal_size::Width(w), terminal_size::Height(h))) => {

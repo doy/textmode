@@ -1,6 +1,6 @@
 use pty_process::Command as _;
 use smol::io::{AsyncReadExt as _, AsyncWriteExt as _};
-use textmode::TextmodeExt as _;
+use textmode::Textmode as _;
 
 enum Command {
     NewWindow,
@@ -213,7 +213,7 @@ impl State {
         .detach();
     }
 
-    async fn redraw_current_window(&mut self, tm: &mut textmode::Textmode) {
+    async fn redraw_current_window(&mut self, tm: &mut textmode::Output) {
         let window = self.current_window();
         tm.clear();
         let new_screen = window.vt.lock_arc().await.screen().clone();
@@ -224,7 +224,7 @@ impl State {
         tm.refresh().await.unwrap();
     }
 
-    async fn update_current_window(&mut self, tm: &mut textmode::Textmode) {
+    async fn update_current_window(&mut self, tm: &mut textmode::Output) {
         let window = self.current_window();
         let old_screen = window.screen.clone();
         let new_screen = window.vt.lock_arc().await.screen().clone();
@@ -244,7 +244,7 @@ impl State {
 
     fn clear_notifications(
         &mut self,
-        tm: &mut textmode::Textmode,
+        tm: &mut textmode::Output,
         screen: &vt100::Screen,
     ) {
         if self.notifications.is_empty() {
@@ -269,7 +269,7 @@ impl State {
 
     fn draw_notifications(
         &mut self,
-        tm: &mut textmode::Textmode,
+        tm: &mut textmode::Output,
         screen: &vt100::Screen,
     ) {
         if self.notifications.is_empty() {
@@ -310,14 +310,14 @@ impl State {
 #[must_use]
 struct Tmux {
     input: textmode::Input,
-    tm: textmode::Textmode,
+    tm: textmode::Output,
     state: State,
 }
 
 impl Tmux {
     async fn new() -> Self {
         let input = textmode::Input::new();
-        let tm = textmode::Textmode::new().await.unwrap();
+        let tm = textmode::Output::new().await.unwrap();
         let state = State::new();
         Self { input, tm, state }
     }

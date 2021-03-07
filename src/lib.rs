@@ -9,7 +9,7 @@ pub use input::{Input, Key};
 #[cfg(feature = "async")]
 pub mod r#async;
 #[cfg(feature = "async")]
-pub use r#async::Textmode;
+pub use r#async::Output;
 
 const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
 const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
@@ -33,7 +33,7 @@ mod private {
     }
 }
 
-pub trait TextmodeExt: private::TextmodeImpl {
+pub trait Textmode: private::TextmodeImpl {
     fn screen(&self) -> &vt100::Screen {
         self.next().screen()
     }
