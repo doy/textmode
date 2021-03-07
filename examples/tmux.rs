@@ -372,7 +372,7 @@ impl Tmux {
                     }
                     Ok(Event::Command(c)) => match c {
                         Command::NewWindow => {
-                            state.new_window(&ex, state.wevents.clone());
+                            state.new_window(ex, state.wevents.clone());
                             state.redraw_current_window(&mut tm).await;
                         }
                         Command::NextWindow => {
@@ -399,7 +399,7 @@ impl Tmux {
 
 async fn async_main(ex: &smol::Executor<'_>) {
     let tmux = Tmux::new().await;
-    tmux.run(&ex).await;
+    tmux.run(ex).await;
 }
 
 fn main() {
