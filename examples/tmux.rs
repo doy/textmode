@@ -45,6 +45,7 @@ enum Event {
     Output,
     WindowExit(usize),
     Command(Command),
+    Notification,
 }
 
 struct Window {
@@ -53,10 +54,18 @@ struct Window {
     screen: vt100::Screen,
 }
 
+#[derive(Clone)]
+struct Notification {
+    text: String,
+    expiry: std::time::Instant,
+}
+
 struct State {
     windows: std::collections::BTreeMap<usize, Window>,
     current_window: usize,
     next_window_id: usize,
+    notifications: std::collections::BTreeMap<usize, Notification>,
+    next_notification_id: usize,
     wevents: smol::channel::Sender<Event>,
     revents: smol::channel::Receiver<Event>,
 }
@@ -68,6 +77,8 @@ impl State {
             windows: std::collections::BTreeMap::new(),
             current_window: 0,
             next_window_id: 0,
+            notifications: std::collections::BTreeMap::new(),
+            next_notification_id: 0,
             wevents: sender,
             revents: receiver,
         }
@@ -81,7 +92,7 @@ impl State {
         self.windows.get_mut(&self.current_window).unwrap()
     }
 
-    fn next_window(&mut self) {
+    fn next_window(&mut self, ex: &smol::Executor<'_>) {
         self.current_window = self
             .windows
             .keys()
@@ -90,6 +101,26 @@ impl State {
             .skip_while(|&id| id < self.current_window)
             .nth(1)
             .unwrap();
+        self.notify(
+            ex,
+            &format!("switched to window {}", self.current_window),
+        );
+    }
+
+    fn notify(&mut self, ex: &smol::Executor<'_>, text: &str) {
+        let now = std::time::Instant::now();
+        let expiry = now + std::time::Duration::from_secs(5);
+        let text = text.to_string();
+        let notification = Notification { text, expiry };
+        let id = self.next_notification_id;
+        self.next_notification_id += 1;
+        self.notifications.insert(id, notification);
+        let notify = self.wevents.clone();
+        ex.spawn(async move {
+            smol::Timer::at(expiry).await;
+            notify.send(Event::Notification).await.unwrap();
+        })
+        .detach();
     }
 
     fn spawn_input_task(&self, ex: &smol::Executor<'_>) {
@@ -118,7 +149,7 @@ impl State {
         .detach();
     }
 
-    async fn new_window(
+    fn new_window(
         &mut self,
         ex: &smol::Executor<'_>,
         notify: smol::channel::Sender<Event>,
@@ -139,6 +170,7 @@ impl State {
         };
         self.windows.insert(id, window);
         self.current_window = id;
+        self.notify(ex, &format!("created window {}", id));
         ex.spawn(async move {
             let mut buf = [0_u8; 4096];
             loop {
@@ -218,20 +250,89 @@ impl State {
         return waiting_for_command;
     }
 
-    async fn redraw_current_window(&self, tm: &mut textmode::Textmode) {
+    async fn redraw_current_window(&mut self, tm: &mut textmode::Textmode) {
         let window = self.current_window();
         tm.clear();
-        tm.write(&window.vt.lock_arc().await.screen().contents_formatted());
+        let new_screen = window.vt.lock_arc().await.screen().clone();
+        tm.write(&new_screen.contents_formatted());
+        self.draw_notifications(tm, &new_screen);
         tm.refresh().await.unwrap();
     }
 
     async fn update_current_window(&mut self, tm: &mut textmode::Textmode) {
-        let window = self.current_window_mut();
+        let window = self.current_window();
+        let old_screen = window.screen.clone();
         let new_screen = window.vt.lock_arc().await.screen().clone();
-        let diff = new_screen.contents_diff(&window.screen);
+        let diff = new_screen.contents_diff(&old_screen);
+        self.clear_notifications(tm, &old_screen);
         tm.write(&diff);
+        self.draw_notifications(tm, &new_screen);
         tm.refresh().await.unwrap();
-        window.screen = new_screen;
+        self.current_window_mut().screen = new_screen;
+    }
+
+    fn clear_notifications(
+        &mut self,
+        tm: &mut textmode::Textmode,
+        screen: &vt100::Screen,
+    ) {
+        if self.notifications.is_empty() {
+            return;
+        }
+
+        let reset_attrs = screen.attributes_formatted();
+        let pos = screen.cursor_position();
+        for (i, row) in screen
+            .rows_formatted(0, 80)
+            .enumerate()
+            .take(self.notifications.len())
+        {
+            tm.move_to(i as u16, 0);
+            tm.reset_attributes();
+            tm.clear_line();
+            tm.write(&row);
+        }
+        tm.move_to(pos.0, pos.1);
+        tm.write(&reset_attrs);
+    }
+
+    fn draw_notifications(
+        &mut self,
+        tm: &mut textmode::Textmode,
+        screen: &vt100::Screen,
+    ) {
+        if self.notifications.is_empty() {
+            return;
+        }
+
+        let now = std::time::Instant::now();
+        self.notifications = self
+            .notifications
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .filter(|(_, v)| v.expiry >= now)
+            .collect();
+
+        if self.notifications.is_empty() {
+            return;
+        }
+
+        let reset_attrs = screen.attributes_formatted();
+        let pos = screen.cursor_position();
+        tm.reset_attributes();
+        tm.set_bgcolor(textmode::color::CYAN);
+        tm.set_fgcolor(textmode::color::WHITE);
+        for (i, notification) in self.notifications.values().enumerate() {
+            tm.move_to(i as u16, 0);
+            tm.clear_line();
+            let str_len = notification.text.len();
+            let spaces = 80 - str_len;
+            let prefix_spaces = spaces / 2;
+            tm.write(&vec![b' '; prefix_spaces]);
+            tm.write_str(&notification.text);
+        }
+        tm.move_to(pos.0, pos.1);
+        tm.write(&reset_attrs);
     }
 }
 
@@ -257,7 +358,7 @@ impl Tmux {
             mut state,
         } = self;
 
-        state.new_window(ex, state.wevents.clone()).await;
+        state.new_window(ex, state.wevents.clone());
         state.spawn_input_task(ex);
 
         ex.run(async {
@@ -276,6 +377,11 @@ impl Tmux {
                             .unwrap();
                     }
                     Ok(Event::WindowExit(id)) => {
+                        // do this first because next_window breaks if
+                        // current_window is greater than all existing windows
+                        if state.current_window == id {
+                            state.next_window(ex)
+                        }
                         let mut dropped_window =
                             state.windows.remove(&id).unwrap();
                         // i can get_mut because at this point the future
@@ -289,24 +395,23 @@ impl Tmux {
                         if state.windows.is_empty() {
                             break;
                         }
-                        if state.current_window == id {
-                            state.next_window()
-                        }
+                        state.notify(ex, &format!("window {} exited", id));
 
                         state.redraw_current_window(&mut tm).await;
                     }
                     Ok(Event::Command(c)) => match c {
                         Command::NewWindow => {
-                            state
-                                .new_window(&ex, state.wevents.clone())
-                                .await;
+                            state.new_window(&ex, state.wevents.clone());
                             state.redraw_current_window(&mut tm).await;
                         }
                         Command::NextWindow => {
-                            state.next_window();
+                            state.next_window(ex);
                             state.redraw_current_window(&mut tm).await;
                         }
                     },
+                    Ok(Event::Notification) => {
+                        state.update_current_window(&mut tm).await;
+                    }
                     Err(e) => {
                         eprintln!("{}", e);
                         break;

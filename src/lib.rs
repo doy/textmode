@@ -27,8 +27,8 @@ mod private {
 }
 
 pub trait TextmodeExt: private::TextmodeImpl {
-    fn cursor_position(&self) -> (u16, u16) {
-        self.next().screen().cursor_position()
+    fn screen(&self) -> &vt100::Screen {
+        self.next().screen()
     }
 
     fn write(&mut self, buf: &[u8]) {
@@ -46,14 +46,22 @@ pub trait TextmodeExt: private::TextmodeImpl {
 
     fn move_to(&mut self, row: u16, col: u16) {
         self.write(b"\x1b[");
-        self.write_u16(row);
+        self.write_u16(row + 1);
         self.write(b";");
-        self.write_u16(col);
+        self.write_u16(col + 1);
         self.write(b"H");
     }
 
     fn clear(&mut self) {
         self.write(b"\x1b[2J");
+    }
+
+    fn clear_line(&mut self) {
+        self.write(b"\x1b[K");
+    }
+
+    fn reset_attributes(&mut self) {
+        self.write(b"\x1b[m");
     }
 
     fn set_fgcolor(&mut self, color: vt100::Color) {
