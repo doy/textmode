@@ -108,7 +108,7 @@ impl Input {
         self.real_read_key(true, false)
     }
 
-    pub fn read_keys_utf8(&mut self) -> std::io::Result<Option<Key>> {
+    pub fn read_keys_string(&mut self) -> std::io::Result<Option<Key>> {
         self.real_read_key(true, true)
     }
 
