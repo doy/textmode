@@ -7,7 +7,7 @@ mod input;
 pub use input::{Input, Key, RawGuard};
 
 #[cfg(feature = "async")]
-pub mod r#async;
+mod r#async;
 #[cfg(feature = "async")]
 pub use r#async::{Output, ScreenGuard};
 
