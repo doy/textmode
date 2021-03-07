@@ -39,16 +39,14 @@ impl Textmode {
         let next = vt100::Parser::new(rows, cols, 0);
 
         let self_ = Self { cur, next };
-        self_
-            .write_stdout(b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h")
-            .await?;
+        self_.write_stdout(super::INIT).await?;
         Ok(self_)
     }
 
     // TODO: without async drop or async closures, i'm not sure how to do
     // better than this
     pub async fn cleanup(&mut self) -> std::io::Result<()> {
-        self.write_stdout(b"\x1b[?47l\x1b8\x1b[?25h").await
+        self.write_stdout(super::DEINIT).await
     }
 
     pub async fn refresh(&mut self) -> std::io::Result<()> {

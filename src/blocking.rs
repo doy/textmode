@@ -39,7 +39,7 @@ impl Textmode {
         let next = vt100::Parser::new(rows, cols, 0);
 
         let self_ = Self { cur, next };
-        self_.write_stdout(b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h")?;
+        self_.write_stdout(super::INIT)?;
         Ok(self_)
     }
 
@@ -60,6 +60,6 @@ impl Textmode {
 
 impl Drop for Textmode {
     fn drop(&mut self) {
-        let _ = self.write_stdout(b"\x1b[?47l\x1b8\x1b[?25h");
+        let _ = self.write_stdout(super::DEINIT);
     }
 }

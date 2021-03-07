@@ -7,6 +7,9 @@ pub mod r#async;
 #[cfg(feature = "async")]
 pub use r#async::Textmode;
 
+const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
+const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
+
 mod private {
     pub trait TextmodeImpl {
         fn cur(&self) -> &vt100::Parser;
@@ -74,6 +77,10 @@ pub trait TextmodeExt: private::TextmodeImpl {
                     self.write(b"\x1b[");
                     self.write_u8(30 + i);
                     self.write(b"m");
+                } else if i < 16 {
+                    self.write(b"\x1b[");
+                    self.write_u8(82 + i);
+                    self.write(b"m");
                 } else {
                     self.write(b"\x1b[38;5;");
                     self.write_u8(i);
@@ -102,6 +109,10 @@ pub trait TextmodeExt: private::TextmodeImpl {
                     self.write(b"\x1b[");
                     self.write_u8(40 + i);
                     self.write(b"m");
+                } else if i < 16 {
+                    self.write(b"\x1b[");
+                    self.write_u8(92 + i);
+                    self.write(b"m");
                 } else {
                     self.write(b"\x1b[48;5;");
                     self.write_u8(i);
@@ -117,6 +128,38 @@ pub trait TextmodeExt: private::TextmodeImpl {
                 self.write_u8(b);
                 self.write(b"m");
             }
+        }
+    }
+
+    fn set_bold(&mut self, bold: bool) {
+        if bold {
+            self.write(b"\x1b[1m");
+        } else {
+            self.write(b"\x1b[22m");
+        }
+    }
+
+    fn set_italic(&mut self, italic: bool) {
+        if italic {
+            self.write(b"\x1b[3m");
+        } else {
+            self.write(b"\x1b[23m");
+        }
+    }
+
+    fn set_underline(&mut self, underline: bool) {
+        if underline {
+            self.write(b"\x1b[4m");
+        } else {
+            self.write(b"\x1b[24m");
+        }
+    }
+
+    fn set_inverse(&mut self, inverse: bool) {
+        if inverse {
+            self.write(b"\x1b[7m");
+        } else {
+            self.write(b"\x1b[27m");
         }
     }
 }
