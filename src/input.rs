@@ -1,6 +1,7 @@
 use std::io::Read as _;
 use std::os::unix::io::AsRawFd as _;
 
+#[derive(Eq, PartialEq, Debug)]
 pub enum Key {
     String(String),
     Char(char),
