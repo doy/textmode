@@ -98,16 +98,14 @@ impl State {
         let notify = self.wevents.clone();
         ex.spawn(async move {
             let mut waiting_for_command = false;
+            input.parse_utf8(false);
+            input.parse_meta(false);
+            input.parse_special_keys(false);
             loop {
-                let want_single_char = waiting_for_command;
+                input.parse_single(waiting_for_command);
                 let key_input = smol::unblock(move || {
-                    if want_single_char {
-                        let key = input.read_key_char();
-                        (input, key)
-                    } else {
-                        let key = input.read_keys();
-                        (input, key)
-                    }
+                    let key = input.read_key();
+                    (input, key)
                 });
                 match key_input.await {
                     (returned_input, Ok(Some(key))) => {
@@ -119,7 +117,7 @@ impl State {
                                         .await
                                         .unwrap();
                                 }
-                                textmode::Key::Char('c') => {
+                                textmode::Key::Byte(b'c') => {
                                     notify
                                         .send(Event::Command(
                                             Command::NewWindow,
@@ -127,7 +125,7 @@ impl State {
                                         .await
                                         .unwrap();
                                 }
-                                textmode::Key::Char('n') => {
+                                textmode::Key::Byte(b'n') => {
                                     notify
                                         .send(Event::Command(
                                             Command::NextWindow,

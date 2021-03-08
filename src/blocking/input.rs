@@ -10,6 +10,7 @@ pub enum Key {
     Ctrl(u8),
     Meta(u8),
     Backspace,
+    Escape,
     Up,
     Down,
     Right,
@@ -38,6 +39,7 @@ impl Key {
             Ctrl(c) => vec![c - b'a' + 1],
             Meta(c) => vec![b'\x1b', c],
             Backspace => b"\x7f".to_vec(),
+            Escape => b"\x1b".to_vec(),
             Up => b"\x1b[A".to_vec(),
             Down => b"\x1b[B".to_vec(),
             Right => b"\x1b[C".to_vec(),
@@ -107,6 +109,13 @@ impl Drop for RawGuard {
 
 pub struct Input {
     buf: Vec<u8>,
+    pos: usize,
+
+    parse_utf8: bool,
+    parse_ctrl: bool,
+    parse_meta: bool,
+    parse_special_keys: bool,
+    parse_single: bool,
 }
 
 #[allow(clippy::new_without_default)]
@@ -134,114 +143,164 @@ impl Input {
     pub fn new_without_raw() -> Self {
         Self {
             buf: Vec::with_capacity(4096),
+            pos: 0,
+            parse_utf8: true,
+            parse_ctrl: true,
+            parse_meta: true,
+            parse_special_keys: true,
+            parse_single: true,
         }
     }
 
-    pub fn read_keys(&mut self) -> std::io::Result<Option<Key>> {
-        self.real_read_key(true, false)
+    pub fn parse_utf8(&mut self, parse: bool) {
+        self.parse_utf8 = parse;
     }
 
-    pub fn read_keys_string(&mut self) -> std::io::Result<Option<Key>> {
-        self.real_read_key(true, true)
+    pub fn parse_ctrl(&mut self, parse: bool) {
+        self.parse_ctrl = parse;
+    }
+
+    pub fn parse_meta(&mut self, parse: bool) {
+        self.parse_meta = parse;
+    }
+
+    pub fn parse_special_keys(&mut self, parse: bool) {
+        self.parse_special_keys = parse;
+    }
+
+    pub fn parse_single(&mut self, parse: bool) {
+        self.parse_single = parse;
     }
 
     pub fn read_key(&mut self) -> std::io::Result<Option<Key>> {
-        self.real_read_key(false, false)
+        if self.parse_single {
+            self.read_single_key()
+        } else {
+            self.maybe_fill_buf()?;
+            if self.parse_utf8 {
+                let prefix: Vec<_> = self
+                    .buf
+                    .iter()
+                    .copied()
+                    .skip(self.pos)
+                    .take_while(|&c| matches!(c, 32..=126 | 128..=255))
+                    .collect();
+                if !prefix.is_empty() {
+                    self.pos += prefix.len();
+                    match std::string::String::from_utf8(prefix) {
+                        Ok(s) => return Ok(Some(Key::String(s))),
+                        Err(e) => {
+                            return Ok(Some(Key::Bytes(e.into_bytes())))
+                        }
+                    }
+                }
+            }
+
+            let prefix: Vec<_> = self
+                .buf
+                .iter()
+                .copied()
+                .skip(self.pos)
+                .take_while(|&c| match c {
+                    0 => true,
+                    1..=26 => !self.parse_ctrl,
+                    27 => !self.parse_meta && !self.parse_special_keys,
+                    28..=31 => true,
+                    32..=126 => true,
+                    127 => !self.parse_special_keys,
+                    128..=255 => true,
+                })
+                .collect();
+            if !prefix.is_empty() {
+                self.pos += prefix.len();
+                return Ok(Some(Key::Bytes(prefix)));
+            }
+
+            self.read_single_key().map(|key| {
+                if let Some(Key::Byte(c)) = key {
+                    Some(Key::Bytes(vec![c]))
+                } else {
+                    key
+                }
+            })
+        }
     }
 
-    pub fn read_key_char(&mut self) -> std::io::Result<Option<Key>> {
-        self.real_read_key(false, true)
-    }
-
-    fn real_read_key(
-        &mut self,
-        combine: bool,
-        utf8: bool,
-    ) -> std::io::Result<Option<Key>> {
-        match self.next_byte(true)? {
-            Some(c @ 32..=126) | Some(c @ 128..=255) => {
-                self.parse_text(c, combine, utf8)
+    fn read_single_key(&mut self) -> std::io::Result<Option<Key>> {
+        match self.getc(true)? {
+            Some(0) => Ok(Some(Key::Byte(0))),
+            Some(c @ 1..=26) => {
+                if self.parse_ctrl {
+                    Ok(Some(Key::Ctrl(b'a' + c - 1)))
+                } else {
+                    Ok(Some(Key::Byte(c)))
+                }
             }
-            Some(c @ 1..=26) => Ok(Some(Key::Ctrl(b'a' + c - 1))),
-            Some(27) => self.parse_escape_sequence(),
-            Some(c @ 0) | Some(c @ 28..=31) => {
-                self.parse_unknown_char(c, combine)
+            Some(27) => {
+                if self.parse_meta || self.parse_special_keys {
+                    self.read_escape_sequence()
+                } else {
+                    Ok(Some(Key::Byte(27)))
+                }
             }
-            Some(127) => Ok(Some(Key::Backspace)),
+            Some(c @ 28..=31) => Ok(Some(Key::Byte(c))),
+            Some(c @ 32..=126) => {
+                if self.parse_utf8 {
+                    Ok(Some(Key::Char(c as char)))
+                } else {
+                    Ok(Some(Key::Byte(c)))
+                }
+            }
+            Some(127) => {
+                if self.parse_special_keys {
+                    Ok(Some(Key::Backspace))
+                } else {
+                    Ok(Some(Key::Byte(127)))
+                }
+            }
+            Some(c @ 128..=255) => {
+                if self.parse_utf8 {
+                    self.read_utf8_char(c)
+                } else {
+                    Ok(Some(Key::Byte(c)))
+                }
+            }
             None => Ok(None),
         }
     }
 
-    fn parse_text(
-        &mut self,
-        c: u8,
-        combine: bool,
-        utf8: bool,
-    ) -> std::io::Result<Option<Key>> {
-        if combine {
-            let idx = self
-                .buf
-                .iter()
-                .take_while(|&c| {
-                    (32..=126).contains(c) || (128..=255).contains(c)
-                })
-                .count();
-            let mut rest = self.buf.split_off(idx);
-            std::mem::swap(&mut self.buf, &mut rest);
-            rest.insert(0, c);
-            if utf8 {
-                match std::string::String::from_utf8(rest) {
-                    Ok(s) => Ok(Some(Key::String(s))),
-                    Err(e) => Ok(Some(Key::Bytes(e.into_bytes()))),
-                }
-            } else {
-                Ok(Some(Key::Bytes(rest)))
-            }
-        } else {
-            if utf8 {
-                self.parse_utf8_char(c)
-            } else {
-                Ok(Some(Key::Byte(c)))
-            }
-        }
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    fn parse_unknown_char(
-        &mut self,
-        c: u8,
-        combine: bool,
-    ) -> std::io::Result<Option<Key>> {
-        if combine {
-            let idx = self
-                .buf
-                .iter()
-                .take_while(|&c| *c == 0 || (28..=31).contains(c))
-                .count();
-            let mut rest = self.buf.split_off(idx);
-            std::mem::swap(&mut self.buf, &mut rest);
-            rest.insert(0, c);
-            Ok(Some(Key::Bytes(rest)))
-        } else {
-            Ok(Some(Key::Byte(c)))
-        }
-    }
-
-    fn parse_escape_sequence(&mut self) -> std::io::Result<Option<Key>> {
+    fn read_escape_sequence(&mut self) -> std::io::Result<Option<Key>> {
         let mut seen = vec![b'\x1b'];
+
+        macro_rules! fail {
+            () => {{
+                for &c in seen.iter().skip(1).rev() {
+                    self.ungetc(c);
+                }
+                if self.parse_special_keys {
+                    return Ok(Some(Key::Escape));
+                } else {
+                    return Ok(Some(Key::Byte(27)));
+                }
+            }};
+        }
         macro_rules! next_byte {
             () => {
-                match self.next_byte(false)? {
+                match self.getc(false)? {
                     Some(c) => c,
-                    None => return Ok(Some(Key::Bytes(seen))),
+                    None => {
+                        fail!()
+                    }
                 }
             };
         }
+
         enum EscapeState {
             Escape,
             CSI(Vec<u8>),
-            CKM(Vec<u8>),
+            CKM,
         }
+
         let mut state = EscapeState::Escape;
         loop {
             let c = next_byte!();
@@ -249,14 +308,27 @@ impl Input {
             match state {
                 EscapeState::Escape => match c {
                     b'[' => {
-                        state = EscapeState::CSI(vec![]);
+                        if self.parse_special_keys {
+                            state = EscapeState::CSI(vec![]);
+                        } else {
+                            fail!()
+                        }
                     }
                     b'O' => {
-                        state = EscapeState::CKM(vec![]);
+                        if self.parse_special_keys {
+                            state = EscapeState::CKM;
+                        } else {
+                            fail!()
+                        }
                     }
-                    _ => {
-                        return Ok(Some(Key::Meta(c)));
+                    b' '..=b'N' | b'P'..=b'Z' | b'\\'..=b'~' => {
+                        if self.parse_meta {
+                            return Ok(Some(Key::Meta(c)));
+                        } else {
+                            fail!()
+                        }
                     }
+                    _ => fail!(),
                 },
                 EscapeState::CSI(ref mut param) => match c {
                     b'A' => return Ok(Some(Key::Up)),
@@ -265,10 +337,7 @@ impl Input {
                     b'D' => return Ok(Some(Key::Left)),
                     b'H' => return Ok(Some(Key::Home)),
                     b'F' => return Ok(Some(Key::End)),
-                    b'0'..=b'9' => {
-                        param.push(c);
-                        state = EscapeState::CSI(param.to_vec());
-                    }
+                    b'0'..=b'9' => param.push(c),
                     b'~' => match param.as_slice() {
                         [b'2'] => return Ok(Some(Key::Insert)),
                         [b'3'] => return Ok(Some(Key::Delete)),
@@ -290,21 +359,11 @@ impl Input {
                         [b'3', b'2'] => return Ok(Some(Key::F(18))),
                         [b'3', b'3'] => return Ok(Some(Key::F(19))),
                         [b'3', b'4'] => return Ok(Some(Key::F(20))),
-                        _ => {
-                            let mut seq = vec![b'\x1b', b'['];
-                            seq.extend(param.iter());
-                            seq.push(b'~');
-                            return Ok(Some(Key::Bytes(seq)));
-                        }
+                        _ => fail!(),
                     },
-                    _ => {
-                        let mut seq = vec![b'\x1b', b'['];
-                        seq.extend(param.iter());
-                        seq.push(c);
-                        return Ok(Some(Key::Bytes(seq)));
-                    }
+                    _ => fail!(),
                 },
-                EscapeState::CKM(ref mut param) => match c {
+                EscapeState::CKM => match c {
                     b'A' => return Ok(Some(Key::KeypadUp)),
                     b'B' => return Ok(Some(Key::KeypadDown)),
                     b'C' => return Ok(Some(Key::KeypadRight)),
@@ -313,37 +372,34 @@ impl Input {
                     b'Q' => return Ok(Some(Key::F(2))),
                     b'R' => return Ok(Some(Key::F(3))),
                     b'S' => return Ok(Some(Key::F(4))),
-                    _ => {
-                        let mut seq = vec![b'\x1b', b'O'];
-                        seq.extend(param.iter());
-                        seq.push(c);
-                        return Ok(Some(Key::Bytes(seq)));
-                    }
+                    _ => fail!(),
                 },
             }
         }
     }
 
-    fn parse_utf8_char(
+    fn read_utf8_char(
         &mut self,
         initial: u8,
     ) -> std::io::Result<Option<Key>> {
         let mut buf = vec![initial];
 
+        macro_rules! fail {
+            () => {{
+                for &c in buf.iter().skip(1).rev() {
+                    self.ungetc(c);
+                }
+                return Ok(Some(Key::Byte(initial)));
+            }};
+        }
         macro_rules! next_byte {
             () => {
-                match self.next_byte(true)? {
+                match self.getc(true)? {
                     Some(c) => {
                         if (0b1000_0000..=0b1011_1111).contains(&c) {
                             c
                         } else {
-                            self.buf = buf
-                                .iter()
-                                .skip(1)
-                                .copied()
-                                .chain(self.buf.iter().copied())
-                                .collect();
-                            return Ok(Some(Key::Byte(initial)));
+                            fail!()
                         }
                     }
                     None => return Ok(None),
@@ -365,41 +421,58 @@ impl Input {
                 buf.push(next_byte!());
                 buf.push(next_byte!());
             }
-            _ => {
-                return Ok(Some(Key::Bytes(buf)));
-            }
+            _ => fail!(),
         }
+
         match std::string::String::from_utf8(buf) {
             Ok(s) => Ok(Some(Key::Char(s.chars().next().unwrap()))),
             Err(e) => {
-                let buf = e.into_bytes();
-                self.buf = buf
-                    .iter()
-                    .skip(1)
-                    .copied()
-                    .chain(self.buf.iter().copied())
-                    .collect();
-                Ok(Some(Key::Byte(initial)))
+                buf = e.into_bytes();
+                fail!()
             }
         }
     }
 
-    fn next_byte(&mut self, fill: bool) -> std::io::Result<Option<u8>> {
-        if self.buf.is_empty() {
-            if !fill || !self.fill_buf()? {
+    fn getc(&mut self, fill: bool) -> std::io::Result<Option<u8>> {
+        if fill {
+            if !self.maybe_fill_buf()? {
+                return Ok(None);
+            }
+        } else {
+            if self.buf_is_empty() {
                 return Ok(None);
             }
         }
-        let c = self.buf.remove(0);
+        let c = self.buf[self.pos];
+        self.pos += 1;
         Ok(Some(c))
+    }
+
+    fn ungetc(&mut self, c: u8) {
+        if self.pos == 0 {
+            self.buf.insert(0, c);
+        } else {
+            self.pos -= 1;
+            self.buf[self.pos] = c;
+        }
+    }
+
+    fn maybe_fill_buf(&mut self) -> std::io::Result<bool> {
+        if self.buf_is_empty() {
+            self.fill_buf()
+        } else {
+            Ok(true)
+        }
+    }
+
+    fn buf_is_empty(&self) -> bool {
+        self.pos >= self.buf.len()
     }
 
     fn fill_buf(&mut self) -> std::io::Result<bool> {
         self.buf.resize(4096, 0);
-        // can't use self.read here because the borrow checker can't tell
-        // that our read implementation doesn't actually need to mutably
-        // borrow self
-        let bytes = std::io::stdin().read(&mut self.buf)?;
+        self.pos = 0;
+        let bytes = read_stdin(&mut self.buf)?;
         if bytes == 0 {
             return Ok(false);
         }
@@ -408,8 +481,6 @@ impl Input {
     }
 }
 
-impl std::io::Read for Input {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        std::io::stdin().read(buf)
-    }
+fn read_stdin(buf: &mut [u8]) -> std::io::Result<usize> {
+    std::io::stdin().read(buf)
 }
