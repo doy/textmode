@@ -1,6 +1,6 @@
 use std::io::Write as _;
 
-use super::private::TextmodeImpl as _;
+use crate::private::TextmodeImpl as _;
 
 pub struct ScreenGuard {
     cleaned_up: bool,
@@ -12,7 +12,7 @@ impl ScreenGuard {
             return Ok(());
         }
         self.cleaned_up = true;
-        write_stdout(super::DEINIT)
+        write_stdout(crate::DEINIT)
     }
 }
 
@@ -27,7 +27,7 @@ pub struct Output {
     next: vt100::Parser,
 }
 
-impl super::private::TextmodeImpl for Output {
+impl crate::private::TextmodeImpl for Output {
     fn cur(&self) -> &vt100::Parser {
         &self.cur
     }
@@ -45,11 +45,11 @@ impl super::private::TextmodeImpl for Output {
     }
 }
 
-impl super::Textmode for Output {}
+impl crate::Textmode for Output {}
 
 impl Output {
     pub fn new() -> std::io::Result<(Self, ScreenGuard)> {
-        write_stdout(super::INIT)?;
+        write_stdout(crate::INIT)?;
         Ok((
             Self::new_without_screen(),
             ScreenGuard { cleaned_up: false },

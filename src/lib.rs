@@ -3,13 +3,12 @@
 pub mod color;
 
 pub mod blocking;
-mod input;
-pub use input::{Input, Key, RawGuard};
+pub use crate::blocking::input::Key;
 
 #[cfg(feature = "async")]
-mod r#async;
+mod output;
 #[cfg(feature = "async")]
-pub use r#async::{Output, ScreenGuard};
+pub use output::{Output, ScreenGuard};
 
 const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
 const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
