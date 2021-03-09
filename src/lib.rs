@@ -1,14 +1,21 @@
 #![allow(clippy::collapsible_if)]
 
-pub mod color;
-
 pub mod blocking;
-pub use crate::blocking::input::Key;
+
+pub mod color;
+mod key;
+pub use key::Key;
+mod raw_guard;
+pub use raw_guard::RawGuard;
 
 #[cfg(feature = "async")]
 mod output;
 #[cfg(feature = "async")]
 pub use output::{Output, ScreenGuard};
+#[cfg(feature = "async")]
+mod input;
+#[cfg(feature = "async")]
+pub use input::Input;
 
 const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
 const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";

@@ -93,7 +93,7 @@ impl State {
     fn spawn_input_task(
         &self,
         ex: &smol::Executor<'_>,
-        mut input: textmode::blocking::Input,
+        mut input: textmode::Input,
     ) {
         let notify = self.wevents.clone();
         ex.spawn(async move {
@@ -103,12 +103,8 @@ impl State {
             input.parse_special_keys(false);
             loop {
                 input.parse_single(waiting_for_command);
-                let key_input = smol::unblock(move || {
-                    let key = input.read_key();
-                    (input, key)
-                });
-                match key_input.await {
-                    (returned_input, Ok(Some(key))) => {
+                match input.read_key().await {
+                    Ok(Some(key)) => {
                         if waiting_for_command {
                             match key {
                                 textmode::Key::Ctrl(b'n') => {
@@ -151,12 +147,11 @@ impl State {
                                 }
                             }
                         }
-                        input = returned_input;
                     }
-                    (_, Ok(None)) => {
+                    Ok(None) => {
                         break;
                     }
-                    (_, Err(e)) => {
+                    Err(e) => {
                         eprintln!("{}", e);
                         break;
                     }
@@ -299,8 +294,8 @@ impl State {
 
 #[must_use]
 struct Tmux {
-    input: textmode::blocking::Input,
-    _raw: textmode::blocking::RawGuard,
+    input: textmode::Input,
+    _raw: textmode::RawGuard,
     tm: textmode::Output,
     _screen: textmode::ScreenGuard,
     state: State,
@@ -308,7 +303,7 @@ struct Tmux {
 
 impl Tmux {
     async fn new() -> Self {
-        let (input, _raw) = textmode::blocking::Input::new();
+        let (input, _raw) = textmode::Input::new();
         let (tm, _screen) = textmode::Output::new().await.unwrap();
         let state = State::new();
         Self {
