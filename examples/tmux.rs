@@ -106,6 +106,7 @@ impl State {
                 match input.read_key().await {
                     Ok(Some(key)) => {
                         if waiting_for_command {
+                            waiting_for_command = false;
                             match key {
                                 textmode::Key::Ctrl(b'n') => {
                                     notify
@@ -129,11 +130,8 @@ impl State {
                                         .await
                                         .unwrap();
                                 }
-                                _ => {
-                                    // ignore
-                                }
+                                _ => {} // ignore
                             }
-                            waiting_for_command = false;
                         } else {
                             match key {
                                 textmode::Key::Ctrl(b'n') => {
@@ -170,7 +168,7 @@ impl State {
             .spawn_pty(Some(&pty_process::Size::new(24, 80)))
             .unwrap();
         let child = std::sync::Arc::new(child);
-        let vt = vt100::Parser::new(24, 80, 0);
+        let vt = vt100::Parser::default();
         let screen = vt.screen().clone();
         let vt = std::sync::Arc::new(smol::lock::Mutex::new(vt));
         let id = self.next_window_id;
