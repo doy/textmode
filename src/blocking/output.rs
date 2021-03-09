@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use std::io::Write as _;
 
 use crate::private::TextmodeImpl as _;
@@ -7,7 +9,7 @@ pub struct ScreenGuard {
 }
 
 impl ScreenGuard {
-    pub fn cleanup(&mut self) -> std::io::Result<()> {
+    pub fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
             return Ok(());
         }
@@ -48,7 +50,7 @@ impl crate::private::TextmodeImpl for Output {
 impl crate::Textmode for Output {}
 
 impl Output {
-    pub fn new() -> std::io::Result<(Self, ScreenGuard)> {
+    pub fn new() -> Result<(Self, ScreenGuard)> {
         write_stdout(crate::INIT)?;
         Ok((
             Self::new_without_screen(),
@@ -69,7 +71,7 @@ impl Output {
         Self { cur, next }
     }
 
-    pub fn refresh(&mut self) -> std::io::Result<()> {
+    pub fn refresh(&mut self) -> Result<()> {
         let diffs = &[
             self.next().screen().contents_diff(self.cur().screen()),
             self.next().screen().input_mode_diff(self.cur().screen()),
@@ -84,9 +86,9 @@ impl Output {
     }
 }
 
-fn write_stdout(buf: &[u8]) -> std::io::Result<()> {
+fn write_stdout(buf: &[u8]) -> Result<()> {
     let mut stdout = std::io::stdout();
-    stdout.write_all(buf)?;
-    stdout.flush()?;
+    stdout.write_all(buf).map_err(Error::WriteStdout)?;
+    stdout.flush().map_err(Error::WriteStdout)?;
     Ok(())
 }

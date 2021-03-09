@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use std::io::Read as _;
 
 pub struct Input {
@@ -49,7 +51,7 @@ impl Input {
         self.parse_single = parse;
     }
 
-    pub fn read_key(&mut self) -> std::io::Result<Option<crate::Key>> {
+    pub fn read_key(&mut self) -> Result<Option<crate::Key>> {
         if self.parse_single {
             self.read_single_key()
         } else {
@@ -105,7 +107,7 @@ impl Input {
         }
     }
 
-    fn read_single_key(&mut self) -> std::io::Result<Option<crate::Key>> {
+    fn read_single_key(&mut self) -> Result<Option<crate::Key>> {
         match self.getc(true)? {
             Some(0) => Ok(Some(crate::Key::Byte(0))),
             Some(c @ 1..=26) => {
@@ -148,9 +150,7 @@ impl Input {
         }
     }
 
-    fn read_escape_sequence(
-        &mut self,
-    ) -> std::io::Result<Option<crate::Key>> {
+    fn read_escape_sequence(&mut self) -> Result<Option<crate::Key>> {
         let mut seen = vec![b'\x1b'];
 
         macro_rules! fail {
@@ -259,10 +259,7 @@ impl Input {
         }
     }
 
-    fn read_utf8_char(
-        &mut self,
-        initial: u8,
-    ) -> std::io::Result<Option<crate::Key>> {
+    fn read_utf8_char(&mut self, initial: u8) -> Result<Option<crate::Key>> {
         let mut buf = vec![initial];
 
         macro_rules! fail {
@@ -314,7 +311,7 @@ impl Input {
         }
     }
 
-    fn getc(&mut self, fill: bool) -> std::io::Result<Option<u8>> {
+    fn getc(&mut self, fill: bool) -> Result<Option<u8>> {
         if fill {
             if !self.maybe_fill_buf()? {
                 return Ok(None);
@@ -338,7 +335,7 @@ impl Input {
         }
     }
 
-    fn maybe_fill_buf(&mut self) -> std::io::Result<bool> {
+    fn maybe_fill_buf(&mut self) -> Result<bool> {
         if self.buf_is_empty() {
             self.fill_buf()
         } else {
@@ -350,7 +347,7 @@ impl Input {
         self.pos >= self.buf.len()
     }
 
-    fn fill_buf(&mut self) -> std::io::Result<bool> {
+    fn fill_buf(&mut self) -> Result<bool> {
         self.buf.resize(4096, 0);
         self.pos = 0;
         let bytes = read_stdin(&mut self.buf)?;
@@ -362,6 +359,6 @@ impl Input {
     }
 }
 
-fn read_stdin(buf: &mut [u8]) -> std::io::Result<usize> {
-    std::io::stdin().read(buf)
+fn read_stdin(buf: &mut [u8]) -> Result<usize> {
+    std::io::stdin().read(buf).map_err(Error::ReadStdin)
 }

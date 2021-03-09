@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use futures_lite::io::AsyncReadExt as _;
 
 pub struct Input {
@@ -49,7 +51,7 @@ impl Input {
         self.parse_single = parse;
     }
 
-    pub async fn read_key(&mut self) -> std::io::Result<Option<crate::Key>> {
+    pub async fn read_key(&mut self) -> Result<Option<crate::Key>> {
         if self.parse_single {
             self.read_single_key().await
         } else {
@@ -105,9 +107,7 @@ impl Input {
         }
     }
 
-    async fn read_single_key(
-        &mut self,
-    ) -> std::io::Result<Option<crate::Key>> {
+    async fn read_single_key(&mut self) -> Result<Option<crate::Key>> {
         match self.getc(true).await? {
             Some(0) => Ok(Some(crate::Key::Byte(0))),
             Some(c @ 1..=26) => {
@@ -150,9 +150,7 @@ impl Input {
         }
     }
 
-    async fn read_escape_sequence(
-        &mut self,
-    ) -> std::io::Result<Option<crate::Key>> {
+    async fn read_escape_sequence(&mut self) -> Result<Option<crate::Key>> {
         let mut seen = vec![b'\x1b'];
 
         macro_rules! fail {
@@ -264,7 +262,7 @@ impl Input {
     async fn read_utf8_char(
         &mut self,
         initial: u8,
-    ) -> std::io::Result<Option<crate::Key>> {
+    ) -> Result<Option<crate::Key>> {
         let mut buf = vec![initial];
 
         macro_rules! fail {
@@ -316,7 +314,7 @@ impl Input {
         }
     }
 
-    async fn getc(&mut self, fill: bool) -> std::io::Result<Option<u8>> {
+    async fn getc(&mut self, fill: bool) -> Result<Option<u8>> {
         if fill {
             if !self.maybe_fill_buf().await? {
                 return Ok(None);
@@ -340,7 +338,7 @@ impl Input {
         }
     }
 
-    async fn maybe_fill_buf(&mut self) -> std::io::Result<bool> {
+    async fn maybe_fill_buf(&mut self) -> Result<bool> {
         if self.buf_is_empty() {
             self.fill_buf().await
         } else {
@@ -352,7 +350,7 @@ impl Input {
         self.pos >= self.buf.len()
     }
 
-    async fn fill_buf(&mut self) -> std::io::Result<bool> {
+    async fn fill_buf(&mut self) -> Result<bool> {
         self.buf.resize(4096, 0);
         self.pos = 0;
         let bytes = read_stdin(&mut self.buf).await?;
@@ -364,6 +362,9 @@ impl Input {
     }
 }
 
-async fn read_stdin(buf: &mut [u8]) -> std::io::Result<usize> {
-    blocking::Unblock::new(std::io::stdin()).read(buf).await
+async fn read_stdin(buf: &mut [u8]) -> Result<usize> {
+    blocking::Unblock::new(std::io::stdin())
+        .read(buf)
+        .await
+        .map_err(Error::ReadStdin)
 }

@@ -1,6 +1,6 @@
 use textmode::Textmode as _;
 
-async fn run(tm: &mut textmode::Output) -> std::io::Result<()> {
+async fn run(tm: &mut textmode::Output) -> textmode::Result<()> {
     tm.move_to(5, 5);
     tm.write_str("foo");
     smol::Timer::after(std::time::Duration::from_secs(2)).await;

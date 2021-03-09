@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use futures_lite::io::AsyncWriteExt as _;
 
 use super::private::TextmodeImpl as _;
@@ -7,7 +9,7 @@ pub struct ScreenGuard {
 }
 
 impl ScreenGuard {
-    pub async fn cleanup(&mut self) -> std::io::Result<()> {
+    pub async fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
             return Ok(());
         }
@@ -50,7 +52,7 @@ impl super::private::TextmodeImpl for Output {
 impl super::Textmode for Output {}
 
 impl Output {
-    pub async fn new() -> std::io::Result<(Self, ScreenGuard)> {
+    pub async fn new() -> Result<(Self, ScreenGuard)> {
         write_stdout(super::INIT).await?;
 
         Ok((
@@ -71,7 +73,7 @@ impl Output {
         Self { cur, next }
     }
 
-    pub async fn refresh(&mut self) -> std::io::Result<()> {
+    pub async fn refresh(&mut self) -> Result<()> {
         let diffs = &[
             self.next().screen().contents_diff(self.cur().screen()),
             self.next().screen().input_mode_diff(self.cur().screen()),
@@ -86,9 +88,9 @@ impl Output {
     }
 }
 
-async fn write_stdout(buf: &[u8]) -> std::io::Result<()> {
+async fn write_stdout(buf: &[u8]) -> Result<()> {
     let mut stdout = blocking::Unblock::new(std::io::stdout());
-    stdout.write_all(buf).await?;
-    stdout.flush().await?;
+    stdout.write_all(buf).await.map_err(Error::WriteStdout)?;
+    stdout.flush().await.map_err(Error::WriteStdout)?;
     Ok(())
 }
