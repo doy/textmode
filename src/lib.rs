@@ -3,7 +3,7 @@
 pub mod blocking;
 
 pub mod color;
-pub mod error;
+mod error;
 pub use error::{Error, Result};
 mod key;
 pub use key::Key;
