@@ -306,6 +306,9 @@ impl Input {
         }
 
         match std::string::String::from_utf8(buf) {
+            // unwrap is fine because buf always contains at least the initial
+            // character, and we have already done the parsing to ensure that
+            // it contains a valid utf8 character before getting here
             Ok(s) => Ok(Some(crate::Key::Char(s.chars().next().unwrap()))),
             Err(e) => {
                 buf = e.into_bytes();
