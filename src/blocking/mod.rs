@@ -1,5 +1,4 @@
 pub(crate) mod input;
-pub use crate::RawGuard;
-pub use input::Input;
+pub use input::{Input, RawGuard};
 mod output;
 pub use output::{Output, ScreenGuard};
