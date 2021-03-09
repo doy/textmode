@@ -9,6 +9,11 @@ pub struct ScreenGuard {
 }
 
 impl ScreenGuard {
+    pub fn new() -> Result<Self> {
+        write_stdout(crate::INIT)?;
+        Ok(Self { cleaned_up: false })
+    }
+
     pub fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
             return Ok(());
@@ -51,11 +56,7 @@ impl crate::Textmode for Output {}
 
 impl Output {
     pub fn new() -> Result<(Self, ScreenGuard)> {
-        write_stdout(crate::INIT)?;
-        Ok((
-            Self::new_without_screen(),
-            ScreenGuard { cleaned_up: false },
-        ))
+        Ok((Self::new_without_screen(), ScreenGuard::new()?))
     }
 
     pub fn new_without_screen() -> Self {

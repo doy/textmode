@@ -9,12 +9,17 @@ pub struct ScreenGuard {
 }
 
 impl ScreenGuard {
+    pub async fn new() -> Result<Self> {
+        write_stdout(crate::INIT).await?;
+        Ok(Self { cleaned_up: false })
+    }
+
     pub async fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
             return Ok(());
         }
         self.cleaned_up = true;
-        write_stdout(super::DEINIT).await
+        write_stdout(crate::DEINIT).await
     }
 }
 
@@ -53,12 +58,7 @@ impl super::Textmode for Output {}
 
 impl Output {
     pub async fn new() -> Result<(Self, ScreenGuard)> {
-        write_stdout(super::INIT).await?;
-
-        Ok((
-            Self::new_without_screen(),
-            ScreenGuard { cleaned_up: false },
-        ))
+        Ok((Self::new_without_screen(), ScreenGuard::new().await?))
     }
 
     pub fn new_without_screen() -> Self {
