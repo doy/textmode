@@ -1,6 +1,64 @@
 use crate::error::*;
 
 use futures_lite::io::AsyncReadExt as _;
+use std::os::unix::io::AsRawFd as _;
+
+pub struct RawGuard {
+    termios: nix::sys::termios::Termios,
+    cleaned_up: bool,
+}
+
+impl RawGuard {
+    #[allow(clippy::new_without_default)]
+    pub async fn new() -> Result<Self> {
+        let stdin = std::io::stdin().as_raw_fd();
+        let termios = blocking::unblock(move || {
+            nix::sys::termios::tcgetattr(stdin).map_err(Error::SetRaw)
+        })
+        .await?;
+        let mut termios_raw = termios.clone();
+        nix::sys::termios::cfmakeraw(&mut termios_raw);
+        blocking::unblock(move || {
+            nix::sys::termios::tcsetattr(
+                stdin,
+                nix::sys::termios::SetArg::TCSANOW,
+                &termios_raw,
+            )
+            .map_err(Error::SetRaw)
+        })
+        .await?;
+        Ok(Self {
+            termios,
+            cleaned_up: false,
+        })
+    }
+
+    pub async fn cleanup(&mut self) -> Result<()> {
+        if self.cleaned_up {
+            return Ok(());
+        }
+        self.cleaned_up = true;
+        let stdin = std::io::stdin().as_raw_fd();
+        let termios = self.termios.clone();
+        blocking::unblock(move || {
+            nix::sys::termios::tcsetattr(
+                stdin,
+                nix::sys::termios::SetArg::TCSANOW,
+                &termios,
+            )
+            .map_err(Error::UnsetRaw)
+        })
+        .await
+    }
+}
+
+impl Drop for RawGuard {
+    fn drop(&mut self) {
+        futures_lite::future::block_on(async {
+            let _ = self.cleanup().await;
+        });
+    }
+}
 
 pub struct Input {
     buf: Vec<u8>,
@@ -15,8 +73,8 @@ pub struct Input {
 
 #[allow(clippy::new_without_default)]
 impl Input {
-    pub fn new() -> Result<(Self, crate::RawGuard)> {
-        Ok((Self::new_without_raw(), crate::RawGuard::new()?))
+    pub async fn new() -> Result<(Self, RawGuard)> {
+        Ok((Self::new_without_raw(), RawGuard::new().await?))
     }
 
     pub fn new_without_raw() -> Self {

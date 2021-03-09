@@ -303,7 +303,7 @@ struct Tmux {
 
 impl Tmux {
     async fn new() -> Self {
-        let (input, _raw) = textmode::Input::new().unwrap();
+        let (input, _raw) = textmode::Input::new().await.unwrap();
         let (tm, _screen) = textmode::Output::new().await.unwrap();
         let state = State::new();
         Self {

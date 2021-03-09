@@ -7,8 +7,6 @@ mod error;
 pub use error::{Error, Result};
 mod key;
 pub use key::Key;
-mod raw_guard;
-pub use raw_guard::RawGuard;
 
 #[cfg(feature = "async")]
 mod output;
@@ -17,7 +15,7 @@ pub use output::{Output, ScreenGuard};
 #[cfg(feature = "async")]
 mod input;
 #[cfg(feature = "async")]
-pub use input::Input;
+pub use input::{Input, RawGuard};
 
 const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
 const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
