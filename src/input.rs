@@ -15,8 +15,8 @@ pub struct Input {
 
 #[allow(clippy::new_without_default)]
 impl Input {
-    pub fn new() -> (Self, crate::RawGuard) {
-        (Self::new_without_raw(), crate::RawGuard::new())
+    pub fn new() -> Result<(Self, crate::RawGuard)> {
+        Ok((Self::new_without_raw(), crate::RawGuard::new()?))
     }
 
     pub fn new_without_raw() -> Self {

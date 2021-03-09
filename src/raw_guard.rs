@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use std::os::unix::io::AsRawFd as _;
 
 pub struct RawGuard {
@@ -7,9 +9,10 @@ pub struct RawGuard {
 
 impl RawGuard {
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let stdin = std::io::stdin().as_raw_fd();
-        let termios = nix::sys::termios::tcgetattr(stdin).unwrap();
+        let termios =
+            nix::sys::termios::tcgetattr(stdin).map_err(Error::SetRaw)?;
         let mut termios_raw = termios.clone();
         nix::sys::termios::cfmakeraw(&mut termios_raw);
         nix::sys::termios::tcsetattr(
@@ -17,29 +20,30 @@ impl RawGuard {
             nix::sys::termios::SetArg::TCSANOW,
             &termios_raw,
         )
-        .unwrap();
-        Self {
+        .map_err(Error::SetRaw)?;
+        Ok(Self {
             termios,
             cleaned_up: false,
-        }
+        })
     }
 
-    pub fn cleanup(&mut self) {
+    pub fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
-            return;
+            return Ok(());
         }
         self.cleaned_up = true;
         let stdin = std::io::stdin().as_raw_fd();
-        let _ = nix::sys::termios::tcsetattr(
+        nix::sys::termios::tcsetattr(
             stdin,
             nix::sys::termios::SetArg::TCSANOW,
             &self.termios,
-        );
+        )
+        .map_err(Error::UnsetRaw)
     }
 }
 
 impl Drop for RawGuard {
     fn drop(&mut self) {
-        self.cleanup();
+        let _ = self.cleanup();
     }
 }
