@@ -10,7 +10,11 @@ pub struct ScreenGuard {
 
 impl ScreenGuard {
     pub async fn new() -> Result<Self> {
-        write_stdout(crate::INIT).await?;
+        write_stdout(
+            &mut blocking::Unblock::new(std::io::stdout()),
+            crate::INIT,
+        )
+        .await?;
         Ok(Self { cleaned_up: false })
     }
 
@@ -19,7 +23,11 @@ impl ScreenGuard {
             return Ok(());
         }
         self.cleaned_up = true;
-        write_stdout(crate::DEINIT).await
+        write_stdout(
+            &mut blocking::Unblock::new(std::io::stdout()),
+            crate::DEINIT,
+        )
+        .await
     }
 }
 
@@ -32,6 +40,7 @@ impl Drop for ScreenGuard {
 }
 
 pub struct Output {
+    stdout: blocking::Unblock<std::io::Stdout>,
     cur: vt100::Parser,
     next: vt100::Parser,
 }
@@ -70,19 +79,25 @@ impl Output {
         };
         let cur = vt100::Parser::new(rows, cols, 0);
         let next = vt100::Parser::new(rows, cols, 0);
-        Self { cur, next }
+        Self {
+            stdout: blocking::Unblock::new(std::io::stdout()),
+            cur,
+            next,
+        }
     }
 
     pub async fn refresh(&mut self) -> Result<()> {
         let diff = self.next().screen().state_diff(self.cur().screen());
-        write_stdout(&diff).await?;
+        write_stdout(&mut self.stdout, &diff).await?;
         self.cur_mut().process(&diff);
         Ok(())
     }
 }
 
-async fn write_stdout(buf: &[u8]) -> Result<()> {
-    let mut stdout = blocking::Unblock::new(std::io::stdout());
+async fn write_stdout(
+    stdout: &mut blocking::Unblock<std::io::Stdout>,
+    buf: &[u8],
+) -> Result<()> {
     stdout.write_all(buf).await.map_err(Error::WriteStdout)?;
     stdout.flush().await.map_err(Error::WriteStdout)?;
     Ok(())
