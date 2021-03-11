@@ -61,6 +61,8 @@ impl Drop for RawGuard {
 }
 
 pub struct Input {
+    stdin: blocking::Unblock<std::io::Stdin>,
+
     buf: Vec<u8>,
     pos: usize,
 
@@ -79,6 +81,7 @@ impl Input {
 
     pub fn new_without_raw() -> Self {
         Self {
+            stdin: blocking::Unblock::new(std::io::stdin()),
             buf: Vec::with_capacity(4096),
             pos: 0,
             parse_utf8: true,
@@ -414,7 +417,7 @@ impl Input {
     async fn fill_buf(&mut self) -> Result<bool> {
         self.buf.resize(4096, 0);
         self.pos = 0;
-        let bytes = read_stdin(&mut self.buf).await?;
+        let bytes = read_stdin(&mut self.stdin, &mut self.buf).await?;
         if bytes == 0 {
             return Ok(false);
         }
@@ -423,9 +426,9 @@ impl Input {
     }
 }
 
-async fn read_stdin(buf: &mut [u8]) -> Result<usize> {
-    blocking::Unblock::new(std::io::stdin())
-        .read(buf)
-        .await
-        .map_err(Error::ReadStdin)
+async fn read_stdin(
+    stdin: &mut blocking::Unblock<std::io::Stdin>,
+    buf: &mut [u8],
+) -> Result<usize> {
+    stdin.read(buf).await.map_err(Error::ReadStdin)
 }
