@@ -73,16 +73,9 @@ impl Output {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        let diffs = &[
-            self.next().screen().contents_diff(self.cur().screen()),
-            self.next().screen().input_mode_diff(self.cur().screen()),
-            self.next().screen().title_diff(self.cur().screen()),
-            self.next().screen().bells_diff(self.cur().screen()),
-        ];
-        for diff in diffs {
-            write_stdout(&diff)?;
-            self.cur_mut().process(&diff);
-        }
+        let diff = self.next().screen().state_diff(self.cur().screen());
+        write_stdout(&diff)?;
+        self.cur_mut().process(&diff);
         Ok(())
     }
 }
