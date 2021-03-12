@@ -2,7 +2,7 @@ use crate::error::*;
 
 use std::io::Write as _;
 
-use crate::private::TextmodeImpl as _;
+use crate::private::Output as _;
 
 pub struct ScreenGuard {
     cleaned_up: bool,
@@ -34,7 +34,7 @@ pub struct Output {
     next: vt100::Parser,
 }
 
-impl crate::private::TextmodeImpl for Output {
+impl crate::private::Output for Output {
     fn cur(&self) -> &vt100::Parser {
         &self.cur
     }

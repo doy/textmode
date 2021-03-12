@@ -1,4 +1,4 @@
-pub trait TextmodeImpl {
+pub trait Output {
     fn cur(&self) -> &vt100::Parser;
     fn cur_mut(&mut self) -> &mut vt100::Parser;
     fn next(&self) -> &vt100::Parser;
@@ -15,7 +15,7 @@ pub trait TextmodeImpl {
     }
 }
 
-pub trait InputImpl {
+pub trait Input {
     fn buf(&self) -> &[u8];
     fn buf_mut(&mut self) -> &mut [u8];
     fn buf_mut_vec(&mut self) -> &mut Vec<u8>;

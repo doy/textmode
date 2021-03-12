@@ -2,7 +2,7 @@ use crate::error::*;
 
 use futures_lite::io::AsyncWriteExt as _;
 
-use super::private::TextmodeImpl as _;
+use crate::private::Output as _;
 
 pub struct ScreenGuard {
     cleaned_up: bool,
@@ -45,7 +45,7 @@ pub struct Output {
     next: vt100::Parser,
 }
 
-impl super::private::TextmodeImpl for Output {
+impl crate::private::Output for Output {
     fn cur(&self) -> &vt100::Parser {
         &self.cur
     }
@@ -63,7 +63,7 @@ impl super::private::TextmodeImpl for Output {
     }
 }
 
-impl super::Textmode for Output {}
+impl crate::Textmode for Output {}
 
 impl Output {
     pub async fn new() -> Result<(Self, ScreenGuard)> {

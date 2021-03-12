@@ -3,7 +3,7 @@ use crate::error::*;
 use std::io::Read as _;
 use std::os::unix::io::AsRawFd as _;
 
-use crate::private::InputImpl as _;
+use crate::private::Input as _;
 
 pub struct RawGuard {
     termios: nix::sys::termios::Termios,
@@ -62,7 +62,7 @@ pub struct Input {
     parse_single: bool,
 }
 
-impl crate::private::InputImpl for Input {
+impl crate::private::Input for Input {
     fn buf(&self) -> &[u8] {
         &self.buf[self.pos..]
     }
