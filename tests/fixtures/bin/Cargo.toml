@@ -1,0 +1,9 @@
+[package]
+name = "textmode_tests"
+version = "0.1.0"
+authors = ["Jesse Luehrs <doy@tozt.net>"]
+edition = "2018"
+
+[dependencies]
+textmode = { path = "../../.." }
+vt100 = "*"

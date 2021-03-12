@@ -19,6 +19,9 @@ default = []
 async = ["blocking", "futures-lite"]
 
 [dev-dependencies]
+assert_cmd = "1.0"
+assert_fs = "1.0"
+escargot = "0.5"
 libc = "0.2"
 pty-process = { version = "0.1", features = ["backend-smol"] }
 smol = "1.2"
