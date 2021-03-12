@@ -312,10 +312,11 @@ impl Tmux {
             mut state,
         } = self;
 
-        state.new_window(ex, state.wevents.clone());
         state.spawn_input_task(ex, input);
 
         ex.run(async {
+            state.new_window(ex, state.wevents.clone());
+
             loop {
                 match state.revents.recv().await {
                     Ok(Event::Output) => {
