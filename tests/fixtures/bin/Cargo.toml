@@ -7,3 +7,9 @@ edition = "2018"
 [dependencies]
 textmode = { path = "../../.." }
 vt100 = "*"
+
+smol = { version = "*", optional = true }
+
+[features]
+default = []
+async = ["textmode/async", "smol"]

@@ -5,7 +5,26 @@ mod fixtures;
 
 #[test]
 fn test_basic() {
-    fixtures::run_fixture("basic", true, |pty| {
+    fixtures::run_fixture("basic", "", true, |pty| {
+        pty.write_all(b"a").unwrap();
+        assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
+
+        pty.write_all(b"a").unwrap();
+        assert!(!fixtures::read_ready(pty.as_raw_fd()));
+
+        pty.write_all(b"a").unwrap();
+        assert_eq!(
+            fixtures::read(pty),
+            b"\x1b[9;9H\x1b[32mbar\x1b[12;12H\x1b[mbaz"
+        );
+
+        pty.write_all(b"a").unwrap();
+    });
+}
+
+#[test]
+fn test_async() {
+    fixtures::run_fixture("async", "async", true, |pty| {
         pty.write_all(b"a").unwrap();
         assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
 

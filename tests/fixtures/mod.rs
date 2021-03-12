@@ -2,7 +2,7 @@ use pty_process::Command as _;
 use std::io::Read as _;
 use std::os::unix::io::AsRawFd as _;
 
-pub fn run_fixture<F>(name: &str, screenguard: bool, f: F)
+pub fn run_fixture<F>(name: &str, features: &str, screenguard: bool, f: F)
 where
     F: FnOnce(&mut std::fs::File),
 {
@@ -13,6 +13,7 @@ where
         .current_target()
         .manifest_path("tests/fixtures/bin/Cargo.toml")
         .target_dir(temp.path())
+        .features(features)
         .run()
         .unwrap();
     let mut cmd = run.command();
