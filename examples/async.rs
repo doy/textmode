@@ -24,8 +24,8 @@ async fn run(
 
 fn main() {
     smol::block_on(async {
-        let mut tm = textmode::Output::new().await.unwrap();
         let mut input = textmode::Input::new().await.unwrap();
+        let mut tm = textmode::Output::new().await.unwrap();
         let e = run(&mut tm, &mut input).await;
         e.unwrap();
     });
