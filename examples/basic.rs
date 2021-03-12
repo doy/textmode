@@ -2,12 +2,13 @@ use textmode::Textmode as _;
 
 fn main() {
     let mut tm = textmode::blocking::Output::new().unwrap();
+    let mut input = textmode::blocking::Input::new().unwrap();
 
     tm.move_to(5, 5);
     tm.write_str("foo");
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    input.read_key().unwrap();
     tm.refresh().unwrap();
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    input.read_key().unwrap();
 
     tm.move_to(8, 8);
     tm.set_fgcolor(textmode::color::GREEN);
@@ -15,7 +16,7 @@ fn main() {
     tm.move_to(11, 11);
     tm.set_fgcolor(vt100::Color::Default);
     tm.write_str("baz");
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    input.read_key().unwrap();
     tm.refresh().unwrap();
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    input.read_key().unwrap();
 }

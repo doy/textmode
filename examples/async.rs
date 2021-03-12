@@ -1,11 +1,14 @@
 use textmode::Textmode as _;
 
-async fn run(tm: &mut textmode::Output) -> textmode::Result<()> {
+async fn run(
+    tm: &mut textmode::Output,
+    input: &mut textmode::Input,
+) -> textmode::Result<()> {
     tm.move_to(5, 5);
     tm.write_str("foo");
-    smol::Timer::after(std::time::Duration::from_secs(2)).await;
+    input.read_key().await?;
     tm.refresh().await?;
-    smol::Timer::after(std::time::Duration::from_secs(2)).await;
+    input.read_key().await?;
 
     tm.move_to(8, 8);
     tm.set_fgcolor(textmode::color::GREEN);
@@ -13,16 +16,17 @@ async fn run(tm: &mut textmode::Output) -> textmode::Result<()> {
     tm.move_to(11, 11);
     tm.set_fgcolor(vt100::Color::Default);
     tm.write_str("baz");
-    smol::Timer::after(std::time::Duration::from_secs(2)).await;
+    input.read_key().await?;
     tm.refresh().await?;
-    smol::Timer::after(std::time::Duration::from_secs(2)).await;
+    input.read_key().await?;
     Ok(())
 }
 
 fn main() {
     smol::block_on(async {
         let mut tm = textmode::Output::new().await.unwrap();
-        let e = run(&mut tm).await;
+        let mut input = textmode::Input::new().await.unwrap();
+        let e = run(&mut tm, &mut input).await;
         e.unwrap();
     });
 }
