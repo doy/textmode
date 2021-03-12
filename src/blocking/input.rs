@@ -6,8 +6,7 @@ use std::os::unix::io::AsRawFd as _;
 use crate::private::Input as _;
 
 pub struct RawGuard {
-    termios: nix::sys::termios::Termios,
-    cleaned_up: bool,
+    termios: Option<nix::sys::termios::Termios>,
 }
 
 impl RawGuard {
@@ -25,23 +24,22 @@ impl RawGuard {
         )
         .map_err(Error::SetRaw)?;
         Ok(Self {
-            termios,
-            cleaned_up: false,
+            termios: Some(termios),
         })
     }
 
     pub fn cleanup(&mut self) -> Result<()> {
-        if self.cleaned_up {
-            return Ok(());
+        if let Some(termios) = self.termios.take() {
+            let stdin = std::io::stdin().as_raw_fd();
+            nix::sys::termios::tcsetattr(
+                stdin,
+                nix::sys::termios::SetArg::TCSANOW,
+                &termios,
+            )
+            .map_err(Error::UnsetRaw)
+        } else {
+            Ok(())
         }
-        self.cleaned_up = true;
-        let stdin = std::io::stdin().as_raw_fd();
-        nix::sys::termios::tcsetattr(
-            stdin,
-            nix::sys::termios::SetArg::TCSANOW,
-            &self.termios,
-        )
-        .map_err(Error::UnsetRaw)
     }
 }
 
