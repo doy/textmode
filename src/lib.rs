@@ -7,6 +7,7 @@ mod error;
 pub use error::{Error, Result};
 mod key;
 pub use key::Key;
+mod private;
 
 #[cfg(feature = "async")]
 mod output;
@@ -19,25 +20,6 @@ pub use input::{Input, RawGuard};
 
 const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
 const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
-
-mod private {
-    pub trait TextmodeImpl {
-        fn cur(&self) -> &vt100::Parser;
-        fn cur_mut(&mut self) -> &mut vt100::Parser;
-        fn next(&self) -> &vt100::Parser;
-        fn next_mut(&mut self) -> &mut vt100::Parser;
-
-        fn write_u16(&mut self, i: u16) {
-            // unwrap is fine because vt100::Parser::write can never fail
-            itoa::write(self.next_mut(), i).unwrap();
-        }
-
-        fn write_u8(&mut self, i: u8) {
-            // unwrap is fine because vt100::Parser::write can never fail
-            itoa::write(self.next_mut(), i).unwrap();
-        }
-    }
-}
 
 pub trait Textmode: private::TextmodeImpl {
     fn screen(&self) -> &vt100::Screen {
