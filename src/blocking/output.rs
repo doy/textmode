@@ -30,6 +30,8 @@ impl Drop for ScreenGuard {
 }
 
 pub struct Output {
+    screen: Option<ScreenGuard>,
+
     cur: vt100::Parser,
     next: vt100::Parser,
 }
@@ -55,8 +57,10 @@ impl crate::private::Output for Output {
 impl crate::Textmode for Output {}
 
 impl Output {
-    pub fn new() -> Result<(Self, ScreenGuard)> {
-        Ok((Self::new_without_screen(), ScreenGuard::new()?))
+    pub fn new() -> Result<Self> {
+        let mut self_ = Self::new_without_screen();
+        self_.screen = Some(ScreenGuard::new()?);
+        Ok(self_)
     }
 
     pub fn new_without_screen() -> Self {
@@ -69,7 +73,15 @@ impl Output {
         let cur = vt100::Parser::new(rows, cols, 0);
         let next = vt100::Parser::new(rows, cols, 0);
 
-        Self { cur, next }
+        Self {
+            screen: None,
+            cur,
+            next,
+        }
+    }
+
+    pub fn take_screen_guard(&mut self) -> Option<ScreenGuard> {
+        self.screen.take()
     }
 
     pub fn refresh(&mut self) -> Result<()> {

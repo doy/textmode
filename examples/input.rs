@@ -1,6 +1,6 @@
 #[cfg(feature = "async")]
 async fn async_main() {
-    let (mut input, _raw) = textmode::Input::new().await.unwrap();
+    let mut input = textmode::Input::new().await.unwrap();
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--disable-utf8" => input.parse_utf8(false),
@@ -34,7 +34,7 @@ fn main() {
 
 #[cfg(not(feature = "async"))]
 fn main() {
-    let (mut input, _raw) = textmode::blocking::Input::new().unwrap();
+    let mut input = textmode::blocking::Input::new().unwrap();
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--disable-utf8" => input.parse_utf8(false),

@@ -41,6 +41,8 @@ impl Drop for ScreenGuard {
 
 pub struct Output {
     stdout: blocking::Unblock<std::io::Stdout>,
+    screen: Option<ScreenGuard>,
+
     cur: vt100::Parser,
     next: vt100::Parser,
 }
@@ -66,8 +68,10 @@ impl crate::private::Output for Output {
 impl crate::Textmode for Output {}
 
 impl Output {
-    pub async fn new() -> Result<(Self, ScreenGuard)> {
-        Ok((Self::new_without_screen(), ScreenGuard::new().await?))
+    pub async fn new() -> Result<Self> {
+        let mut self_ = Self::new_without_screen();
+        self_.screen = Some(ScreenGuard::new().await?);
+        Ok(self_)
     }
 
     pub fn new_without_screen() -> Self {
@@ -81,9 +85,14 @@ impl Output {
         let next = vt100::Parser::new(rows, cols, 0);
         Self {
             stdout: blocking::Unblock::new(std::io::stdout()),
+            screen: None,
             cur,
             next,
         }
+    }
+
+    pub fn take_screen_guard(&mut self) -> Option<ScreenGuard> {
+        self.screen.take()
     }
 
     pub async fn refresh(&mut self) -> Result<()> {

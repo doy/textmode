@@ -293,32 +293,22 @@ impl State {
 #[must_use]
 struct Tmux {
     input: textmode::Input,
-    _raw: textmode::RawGuard,
     tm: textmode::Output,
-    _screen: textmode::ScreenGuard,
     state: State,
 }
 
 impl Tmux {
     async fn new() -> Self {
-        let (input, _raw) = textmode::Input::new().await.unwrap();
-        let (tm, _screen) = textmode::Output::new().await.unwrap();
+        let input = textmode::Input::new().await.unwrap();
+        let tm = textmode::Output::new().await.unwrap();
         let state = State::new();
-        Self {
-            input,
-            _raw,
-            tm,
-            _screen,
-            state,
-        }
+        Self { input, tm, state }
     }
 
     async fn run(self, ex: &smol::Executor<'_>) {
         let Self {
             input,
-            _raw,
             mut tm,
-            _screen,
             mut state,
         } = self;
 

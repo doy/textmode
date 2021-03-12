@@ -61,6 +61,7 @@ impl Drop for RawGuard {
 
 pub struct Input {
     stdin: blocking::Unblock<std::io::Stdin>,
+    raw: Option<RawGuard>,
 
     buf: Vec<u8>,
     pos: usize,
@@ -124,13 +125,16 @@ impl crate::private::Input for Input {
 
 #[allow(clippy::new_without_default)]
 impl Input {
-    pub async fn new() -> Result<(Self, RawGuard)> {
-        Ok((Self::new_without_raw(), RawGuard::new().await?))
+    pub async fn new() -> Result<Self> {
+        let mut self_ = Self::new_without_raw();
+        self_.raw = Some(RawGuard::new().await?);
+        Ok(self_)
     }
 
     pub fn new_without_raw() -> Self {
         Self {
             stdin: blocking::Unblock::new(std::io::stdin()),
+            raw: None,
             buf: Vec::with_capacity(4096),
             pos: 0,
             parse_utf8: true,
@@ -159,6 +163,10 @@ impl Input {
 
     pub fn parse_single(&mut self, parse: bool) {
         self.parse_single = parse;
+    }
+
+    pub fn take_raw_guard(&mut self) -> Option<RawGuard> {
+        self.raw.take()
     }
 
     pub async fn read_key(&mut self) -> Result<Option<crate::Key>> {
