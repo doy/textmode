@@ -65,9 +65,9 @@ pub trait Input {
                         && !self.should_parse_special_keys()
                 }
                 28..=31 => true,
-                32..=126 => true,
+                32..=126 => !self.should_parse_utf8(),
                 127 => !self.should_parse_special_keys(),
-                128..=255 => true,
+                128..=255 => !self.should_parse_utf8(),
             })
             .collect();
         if !prefix.is_empty() {

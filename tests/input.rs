@@ -144,44 +144,20 @@ fn run_input_test(
                 }
             } else {
                 if utf8 {
-                    // assert_eq!(
-                    //     std::string::String::from_utf8(fixtures::read_line(
-                    //         &mut r
-                    //     ))
-                    //     .unwrap(),
-                    //     "Bytes([27]): [27]\r\n"
-                    // );
-                    // assert_eq!(
-                    //     std::string::String::from_utf8(fixtures::read_line(
-                    //         &mut r
-                    //     ))
-                    //     .unwrap(),
-                    //     "String(\"[A\"): [91, 65]\r\n"
-                    // );
-                    if meta {
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "Bytes([27]): [27]\r\n"
-                        );
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "String(\"[A\"): [91, 65]\r\n"
-                        );
-                    } else {
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "Bytes([27, 91, 65]): [27, 91, 65]\r\n"
-                        );
-                    }
+                    assert_eq!(
+                        std::string::String::from_utf8(fixtures::read_line(
+                            &mut r
+                        ))
+                        .unwrap(),
+                        "Bytes([27]): [27]\r\n"
+                    );
+                    assert_eq!(
+                        std::string::String::from_utf8(fixtures::read_line(
+                            &mut r
+                        ))
+                        .unwrap(),
+                        "String(\"[A\"): [91, 65]\r\n"
+                    );
                 } else {
                     if meta {
                         assert_eq!(
