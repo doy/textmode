@@ -86,138 +86,134 @@ fn run_input_test(
     fixture.run(&args, |pty| {
         let mut r = std::io::BufReader::new(pty);
 
-        r.get_mut()
-            .write_all(&textmode::Key::Up.into_bytes())
-            .unwrap();
+        assert_no_more_lines(&mut r);
+
+        write(r.get_mut(), textmode::Key::Up);
         if special_keys {
-            assert_eq!(
-                std::string::String::from_utf8(fixtures::read_line(&mut r))
-                    .unwrap(),
-                "Up: [27, 91, 65]\r\n"
-            );
+            assert_line(&mut r, "Up: [27, 91, 65]");
         } else {
             if single {
                 if utf8 {
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Byte(27): [27]\r\n"
-                    );
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Char('['): [91]\r\n"
-                    );
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Char('A'): [65]\r\n"
-                    );
+                    assert_line(&mut r, "Byte(27): [27]");
+                    assert_line(&mut r, "Char('['): [91]");
+                    assert_line(&mut r, "Char('A'): [65]");
                 } else {
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Byte(27): [27]\r\n"
-                    );
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Byte(91): [91]\r\n"
-                    );
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Byte(65): [65]\r\n"
-                    );
+                    assert_line(&mut r, "Byte(27): [27]");
+                    assert_line(&mut r, "Byte(91): [91]");
+                    assert_line(&mut r, "Byte(65): [65]");
                 }
             } else {
                 if utf8 {
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "Bytes([27]): [27]\r\n"
-                    );
-                    assert_eq!(
-                        std::string::String::from_utf8(fixtures::read_line(
-                            &mut r
-                        ))
-                        .unwrap(),
-                        "String(\"[A\"): [91, 65]\r\n"
-                    );
+                    assert_line(&mut r, "Bytes([27]): [27]");
+                    assert_line(&mut r, "String(\"[A\"): [91, 65]");
                 } else {
+                    // TODO: ideally this wouldn't make a difference
                     if meta {
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "Bytes([27]): [27]\r\n"
-                        );
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "Bytes([91, 65]): [91, 65]\r\n"
-                        );
+                        assert_line(&mut r, "Bytes([27]): [27]");
+                        assert_line(&mut r, "Bytes([91, 65]): [91, 65]");
                     } else {
-                        assert_eq!(
-                            std::string::String::from_utf8(
-                                fixtures::read_line(&mut r)
-                            )
-                            .unwrap(),
-                            "Bytes([27, 91, 65]): [27, 91, 65]\r\n"
+                        assert_line(
+                            &mut r,
+                            "Bytes([27, 91, 65]): [27, 91, 65]",
                         );
                     }
                 }
             }
         }
-        assert!(!fixtures::read_ready(r.get_ref().as_raw_fd()));
-        assert!(r.buffer().is_empty());
+        assert_no_more_lines(&mut r);
 
-        r.get_mut()
-            .write_all(&textmode::Key::Ctrl(b'c').into_bytes())
-            .unwrap();
-        if ctrl {
-            assert_eq!(
-                std::string::String::from_utf8(fixtures::read_line(&mut r))
-                    .unwrap(),
-                "Ctrl(99): [3]\r\n"
-            );
+        write(r.get_mut(), textmode::Key::Meta(b'c'));
+        if meta {
+            assert_line(&mut r, "Meta(99): [27, 99]");
         } else {
-            if single {
-                assert_eq!(
-                    std::string::String::from_utf8(fixtures::read_line(
-                        &mut r
-                    ))
-                    .unwrap(),
-                    "Byte(3): [3]\r\n"
-                );
+            if special_keys {
+                assert_line(&mut r, "Escape: [27]");
+                if utf8 {
+                    if single {
+                        assert_line(&mut r, "Char('c'): [99]");
+                    } else {
+                        assert_line(&mut r, "String(\"c\"): [99]");
+                    }
+                } else {
+                    if single {
+                        assert_line(&mut r, "Byte(99): [99]");
+                    } else {
+                        assert_line(&mut r, "Bytes([99]): [99]");
+                    }
+                }
             } else {
-                assert_eq!(
-                    std::string::String::from_utf8(fixtures::read_line(
-                        &mut r
-                    ))
-                    .unwrap(),
-                    "Bytes([3]): [3]\r\n"
+                if single {
+                    assert_line(&mut r, "Byte(27): [27]");
+                    if utf8 {
+                        assert_line(&mut r, "Char('c'): [99]");
+                    } else {
+                        assert_line(&mut r, "Byte(99): [99]");
+                    }
+                } else {
+                    if utf8 {
+                        assert_line(&mut r, "Bytes([27]): [27]");
+                        assert_line(&mut r, "String(\"c\"): [99]");
+                    } else {
+                        assert_line(&mut r, "Bytes([27, 99]): [27, 99]");
+                    }
+                }
+            }
+        }
+        assert_no_more_lines(&mut r);
+
+        write(r.get_mut(), textmode::Key::String("foo".to_string()));
+        if single {
+            if utf8 {
+                assert_line(&mut r, "Char('f'): [102]");
+                assert_line(&mut r, "Char('o'): [111]");
+                assert_line(&mut r, "Char('o'): [111]");
+            } else {
+                assert_line(&mut r, "Byte(102): [102]");
+                assert_line(&mut r, "Byte(111): [111]");
+                assert_line(&mut r, "Byte(111): [111]");
+            }
+        } else {
+            if utf8 {
+                assert_line(&mut r, "String(\"foo\"): [102, 111, 111]");
+            } else {
+                assert_line(
+                    &mut r,
+                    "Bytes([102, 111, 111]): [102, 111, 111]",
                 );
             }
         }
-        assert!(!fixtures::read_ready(r.get_ref().as_raw_fd()));
-        assert!(r.buffer().is_empty());
+        assert_no_more_lines(&mut r);
+
+        write(r.get_mut(), textmode::Key::Ctrl(b'c'));
+        if ctrl {
+            assert_line(&mut r, "Ctrl(99): [3]");
+        } else {
+            if single {
+                assert_line(&mut r, "Byte(3): [3]");
+            } else {
+                assert_line(&mut r, "Bytes([3]): [3]");
+            }
+        }
+        assert_no_more_lines(&mut r);
     });
+}
+
+fn write(f: &mut std::fs::File, key: textmode::Key) {
+    f.write_all(&key.into_bytes()).unwrap();
+}
+
+fn read(f: &mut std::io::BufReader<&mut std::fs::File>) -> String {
+    std::string::String::from_utf8(fixtures::read_line(f)).unwrap()
+}
+
+fn assert_line(
+    f: &mut std::io::BufReader<&mut std::fs::File>,
+    expected: &str,
+) {
+    assert_eq!(read(f), format!("{}\r\n", expected));
+}
+
+fn assert_no_more_lines(f: &mut std::io::BufReader<&mut std::fs::File>) {
+    assert!(!fixtures::read_ready(f.get_ref().as_raw_fd()));
+    assert!(f.buffer().is_empty());
 }
