@@ -99,6 +99,7 @@ impl BuiltFixture {
 }
 
 #[allow(dead_code)]
+#[track_caller]
 pub fn read(f: &mut std::fs::File) -> Vec<u8> {
     assert!(read_ready(f.as_raw_fd()));
     let mut buf = vec![0u8; 1024];
@@ -108,6 +109,7 @@ pub fn read(f: &mut std::fs::File) -> Vec<u8> {
 }
 
 #[allow(dead_code)]
+#[track_caller]
 pub fn read_line(f: &mut std::io::BufReader<&mut std::fs::File>) -> Vec<u8> {
     assert!(!f.buffer().is_empty() || read_ready(f.get_ref().as_raw_fd()));
     let mut buf = vec![];

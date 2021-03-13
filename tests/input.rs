@@ -198,14 +198,17 @@ fn run_input_test(
     });
 }
 
+#[track_caller]
 fn write(f: &mut std::fs::File, key: textmode::Key) {
     f.write_all(&key.into_bytes()).unwrap();
 }
 
+#[track_caller]
 fn read(f: &mut std::io::BufReader<&mut std::fs::File>) -> String {
     std::string::String::from_utf8(fixtures::read_line(f)).unwrap()
 }
 
+#[track_caller]
 fn assert_line(
     f: &mut std::io::BufReader<&mut std::fs::File>,
     expected: &str,
@@ -213,7 +216,18 @@ fn assert_line(
     assert_eq!(read(f), format!("{}\r\n", expected));
 }
 
+#[track_caller]
 fn assert_no_more_lines(f: &mut std::io::BufReader<&mut std::fs::File>) {
-    assert!(!fixtures::read_ready(f.get_ref().as_raw_fd()));
-    assert!(f.buffer().is_empty());
+    if fixtures::read_ready(f.get_ref().as_raw_fd()) || !f.buffer().is_empty()
+    {
+        use std::io::Read as _;
+        let mut buf = vec![0; 4096];
+        let bytes = f.read(&mut buf).unwrap();
+        buf.truncate(bytes);
+        panic!(
+            "got bytes: \"{}\"({:?})",
+            std::string::String::from_utf8_lossy(&buf),
+            buf
+        );
+    }
 }
