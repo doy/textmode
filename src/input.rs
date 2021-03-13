@@ -192,24 +192,22 @@ impl Input {
     }
 
     async fn fill_buf(&mut self) -> Result<bool> {
-        if !self.buf_is_empty() {
-            return Ok(true);
+        if self.buf_is_empty() {
+            self.buf.resize(4096, 0);
+            self.pos = 0;
+            let bytes = read_stdin(&mut self.stdin, &mut self.buf).await?;
+            if bytes == 0 {
+                return Ok(false);
+            }
+            self.buf.truncate(bytes);
         }
-
-        self.buf.resize(4096, 0);
-        self.pos = 0;
-        let bytes = read_stdin(&mut self.stdin, &mut self.buf).await?;
-        if bytes == 0 {
-            return Ok(false);
-        }
-        self.buf.truncate(bytes);
 
         if self.parse_utf8 {
-            let mut extra = self.find_truncated_utf8();
-            if extra > 0 {
+            let expected_bytes = self.expected_leading_utf8_bytes();
+            if self.buf.len() < self.pos + expected_bytes {
                 let mut cur = self.buf.len();
-                self.buf.resize(4096 + extra, 0);
-                while extra > 0 {
+                self.buf.resize(4096 + expected_bytes, 0);
+                while cur < self.pos + expected_bytes {
                     let bytes =
                         read_stdin(&mut self.stdin, &mut self.buf[cur..])
                             .await?;
@@ -217,7 +215,6 @@ impl Input {
                         return Ok(false);
                     }
                     cur += bytes;
-                    extra = extra.saturating_sub(bytes);
                 }
                 self.buf.truncate(cur);
             }

@@ -39,13 +39,33 @@ pub trait Input {
             .buf()
             .iter()
             .copied()
-            .take_while(|&c| matches!(c, 32..=126 | 128..=255))
+            .take_while(|&c| matches!(c, 32..=126 | 128..=247))
             .collect();
         if !prefix.is_empty() {
-            self.consume(prefix.len());
-            match std::string::String::from_utf8(prefix) {
-                Ok(s) => return Ok(Some(crate::Key::String(s))),
-                Err(e) => return Ok(Some(crate::Key::Bytes(e.into_bytes()))),
+            match std::string::String::from_utf8_lossy(&prefix) {
+                std::borrow::Cow::Borrowed(s) => {
+                    self.consume(s.len());
+                    return Ok(Some(crate::Key::String(s.to_string())));
+                }
+                std::borrow::Cow::Owned(mut s) => {
+                    for (i, window) in s.as_bytes().windows(3).enumerate() {
+                        if window == [0xef, 0xbf, 0xbd] {
+                            if i > 0 {
+                                self.consume(i);
+                                s.truncate(i);
+                                return Ok(Some(crate::Key::String(s)));
+                            } else {
+                                // not quite correct, but figuring out how to
+                                // take only the invalid utf8 seems hard (and
+                                // this should come up very rarely)
+                                self.consume(prefix.len());
+                                return Ok(Some(crate::Key::Bytes(prefix)));
+                            }
+                        }
+                    }
+                    self.consume(s.len());
+                    return Ok(Some(crate::Key::String(s)));
+                }
             }
         }
 
@@ -67,7 +87,8 @@ pub trait Input {
                 28..=31 => true,
                 32..=126 => !self.should_parse_utf8(),
                 127 => !self.should_parse_special_keys(),
-                128..=255 => !self.should_parse_utf8(),
+                128..=247 => !self.should_parse_utf8(),
+                248..=255 => true,
             })
             .collect();
         if !prefix.is_empty() {
@@ -261,6 +282,7 @@ pub trait Input {
                         if (0b1000_0000..=0b1011_1111).contains(&c) {
                             c
                         } else {
+                            self.ungetc(c);
                             fail!()
                         }
                     }
@@ -317,23 +339,13 @@ pub trait Input {
         }
     }
 
-    fn find_truncated_utf8(&self) -> usize {
-        for i in 0..4 {
-            match self.buf()[self.buf().len() - 1 - i] {
-                0b0000_0000..=0b0111_1111 => return 0,
-                0b1100_0000..=0b1101_1111 => {
-                    return 1usize.saturating_sub(i);
-                }
-                0b1110_0000..=0b1110_1111 => {
-                    return 2usize.saturating_sub(i);
-                }
-                0b1111_0000..=0b1111_0111 => {
-                    return 3usize.saturating_sub(i);
-                }
-                0b1000_0000..=0b1011_1111 => {}
-                _ => return 0,
-            }
+    fn expected_leading_utf8_bytes(&self) -> usize {
+        match self.buf()[0] {
+            0b0000_0000..=0b0111_1111 => 1,
+            0b1100_0000..=0b1101_1111 => 2,
+            0b1110_0000..=0b1110_1111 => 3,
+            0b1111_0000..=0b1111_0111 => 4,
+            _ => 1,
         }
-        0
     }
 }
