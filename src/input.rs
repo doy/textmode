@@ -239,13 +239,13 @@ impl Input {
         }
     }
 
-    async fn fill_buf(&mut self) -> Result<bool> {
+    async fn fill_buf(&mut self) -> Result<()> {
         if self.buf_is_empty() {
             self.buf.resize(4096, 0);
             self.pos = 0;
             let bytes = read_stdin(&mut self.stdin, &mut self.buf).await?;
             if bytes == 0 {
-                return Ok(false);
+                return Ok(());
             }
             self.buf.truncate(bytes);
         }
@@ -260,7 +260,7 @@ impl Input {
                         read_stdin(&mut self.stdin, &mut self.buf[cur..])
                             .await?;
                     if bytes == 0 {
-                        return Ok(false);
+                        return Ok(());
                     }
                     cur += bytes;
                 }
@@ -268,7 +268,7 @@ impl Input {
             }
         }
 
-        Ok(true)
+        Ok(())
     }
 }
 
