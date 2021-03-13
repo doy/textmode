@@ -5,12 +5,16 @@ use std::os::unix::io::AsRawFd as _;
 
 use crate::private::Input as _;
 
+/// Switches the terminal on `stdin` to raw mode, and restores it when this
+/// object goes out of scope.
 pub struct RawGuard {
     termios: Option<nix::sys::termios::Termios>,
 }
 
 impl RawGuard {
-    #[allow(clippy::new_without_default)]
+    /// Switches the terminal on `stdin` to raw mode and returns a guard
+    /// object. This is typically called as part of
+    /// [`Input::new`](Input::new).
     pub async fn new() -> Result<Self> {
         let stdin = std::io::stdin().as_raw_fd();
         let termios = blocking::unblock(move || {
@@ -33,6 +37,7 @@ impl RawGuard {
         })
     }
 
+    /// Switch back from raw mode early.
     pub async fn cleanup(&mut self) -> Result<()> {
         if let Some(termios) = self.termios.take() {
             let stdin = std::io::stdin().as_raw_fd();
@@ -52,6 +57,9 @@ impl RawGuard {
 }
 
 impl Drop for RawGuard {
+    /// Calls `cleanup`. Note that this may block, due to Rust's current lack
+    /// of an async drop mechanism. If this could be a problem, you should
+    /// call `cleanup` manually instead.
     fn drop(&mut self) {
         futures_lite::future::block_on(async {
             let _ = self.cleanup().await;
@@ -59,6 +67,12 @@ impl Drop for RawGuard {
     }
 }
 
+/// Manages handling terminal input from `stdin`.
+///
+/// The primary interface provided is [`read_key`](Input::read_key). You can
+/// additionally configure the types of keypresses you are interested in
+/// through the `parse_*` methods. This configuration can be changed between
+/// any two calls to [`read_key`](Input::read_key).
 pub struct Input {
     stdin: blocking::Unblock<std::io::Stdin>,
     raw: Option<RawGuard>,
@@ -123,14 +137,17 @@ impl crate::private::Input for Input {
     }
 }
 
-#[allow(clippy::new_without_default)]
 impl Input {
+    /// Creates a new `Input` instance containing a [`RawGuard`](RawGuard)
+    /// instance.
     pub async fn new() -> Result<Self> {
         let mut self_ = Self::new_without_raw();
         self_.raw = Some(RawGuard::new().await?);
         Ok(self_)
     }
 
+    /// Creates a new `Input` instance without creating a
+    /// [`RawGuard`](RawGuard) instance.
     pub fn new_without_raw() -> Self {
         Self {
             stdin: blocking::Unblock::new(std::io::stdin()),
@@ -145,30 +162,61 @@ impl Input {
         }
     }
 
-    pub fn parse_utf8(&mut self, parse: bool) {
-        self.parse_utf8 = parse;
-    }
-
-    pub fn parse_ctrl(&mut self, parse: bool) {
-        self.parse_ctrl = parse;
-    }
-
-    pub fn parse_meta(&mut self, parse: bool) {
-        self.parse_meta = parse;
-    }
-
-    pub fn parse_special_keys(&mut self, parse: bool) {
-        self.parse_special_keys = parse;
-    }
-
-    pub fn parse_single(&mut self, parse: bool) {
-        self.parse_single = parse;
-    }
-
+    /// Removes the [`RawGuard`](RawGuard) instance stored in this `Input`
+    /// instance and returns it. This can be useful if you need to manage the
+    /// lifetime of the [`RawGuard`](RawGuard) instance separately.
     pub fn take_raw_guard(&mut self) -> Option<RawGuard> {
         self.raw.take()
     }
 
+    /// Sets whether `read_key` should try to produce
+    /// [`String`](crate::Key::String) or [`Char`](crate::Key::Char) keys when
+    /// possible, rather than [`Bytes`](crate::Key::Bytes) or
+    /// [`Byte`](crate::Key::Byte) keys. Note that
+    /// [`Bytes`](crate::Key::Bytes) or [`Byte`](crate::Key::Byte) keys may
+    /// still be produced if the input fails to be parsed as UTF-8. Defaults
+    /// to true.
+    pub fn parse_utf8(&mut self, parse: bool) {
+        self.parse_utf8 = parse;
+    }
+
+    /// Sets whether `read_key` should produce [`Ctrl`](crate::Key::Ctrl) keys
+    /// when possible, rather than [`Bytes`](crate::Key::Bytes) or
+    /// [`Byte`](crate::Key::Byte) keys. Defaults to true.
+    pub fn parse_ctrl(&mut self, parse: bool) {
+        self.parse_ctrl = parse;
+    }
+
+    /// Sets whether `read_key` should produce [`Meta`](crate::Key::Meta) keys
+    /// when possible, rather than producing the
+    /// [`Escape`](crate::Key::Escape) key separately. Defaults to true.
+    pub fn parse_meta(&mut self, parse: bool) {
+        self.parse_meta = parse;
+    }
+
+    /// Sets whether `read_key` should produce keys other than
+    /// [`String`](crate::Key::String), [`Char`](crate::Key::Char),
+    /// [`Bytes`](crate::Key::Bytes), [`Byte`](crate::Key::Byte),
+    /// [`Ctrl`](crate::Key::Ctrl), or [`Meta`](crate::Key::Meta). Defaults to
+    /// true.
+    pub fn parse_special_keys(&mut self, parse: bool) {
+        self.parse_special_keys = parse;
+    }
+
+    /// Sets whether `read_key` should produce individual
+    /// [`Char`](crate::Key::Char) or [`Byte`](crate::Key::Byte) keys, rather
+    /// than combining them into [`String`](crate::Key::String) or
+    /// [`Bytes`](crate::Key::Bytes) keys when possible. When this is true,
+    /// [`String`](crate::Key::String) and [`Bytes`](crate::Key::Bytes) will
+    /// never be returned, and when this is false, [`Char`](crate::Key::Char)
+    /// and [`Byte`](crate::Key::Byte) will never be returned. Defaults to
+    /// true.
+    pub fn parse_single(&mut self, parse: bool) {
+        self.parse_single = parse;
+    }
+
+    /// Reads a keypress from the terminal on `stdin`. Returns `Ok(None)` on
+    /// EOF.
     pub async fn read_key(&mut self) -> Result<Option<crate::Key>> {
         self.fill_buf().await?;
 

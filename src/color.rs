@@ -1,3 +1,5 @@
+//! Constants for the basic 16 terminal colors.
+
 pub const BLACK: vt100::Color = vt100::Color::Idx(0);
 pub const RED: vt100::Color = vt100::Color::Idx(1);
 pub const GREEN: vt100::Color = vt100::Color::Idx(2);

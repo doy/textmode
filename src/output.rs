@@ -4,11 +4,16 @@ use futures_lite::io::AsyncWriteExt as _;
 
 use crate::private::Output as _;
 
+/// Switches the terminal on `stdout` to alternate screen mode, and restores
+/// it when this object goes out of scope.
 pub struct ScreenGuard {
     cleaned_up: bool,
 }
 
 impl ScreenGuard {
+    /// Switches the terminal on `stdout` to alternate screen mode and returns
+    /// a guard object. This is typically called as part of
+    /// [`Output::new`](Output::new).
     pub async fn new() -> Result<Self> {
         write_stdout(
             &mut blocking::Unblock::new(std::io::stdout()),
@@ -18,6 +23,7 @@ impl ScreenGuard {
         Ok(Self { cleaned_up: false })
     }
 
+    /// Switch back from alternate screen mode early.
     pub async fn cleanup(&mut self) -> Result<()> {
         if self.cleaned_up {
             return Ok(());
@@ -32,6 +38,9 @@ impl ScreenGuard {
 }
 
 impl Drop for ScreenGuard {
+    /// Calls `cleanup`. Note that this may block, due to Rust's current lack
+    /// of an async drop mechanism. If this could be a problem, you should
+    /// call `cleanup` manually instead.
     fn drop(&mut self) {
         futures_lite::future::block_on(async {
             let _ = self.cleanup().await;
@@ -39,6 +48,12 @@ impl Drop for ScreenGuard {
     }
 }
 
+/// Manages drawing to the terminal on `stdout`.
+///
+/// Most functionality is provided by the [`Textmode`](crate::Textmode) trait.
+/// You should call those trait methods to draw to the in-memory screen, and
+/// then call [`refresh`](Output::refresh) when you want to update the
+/// terminal on `stdout`.
 pub struct Output {
     stdout: blocking::Unblock<std::io::Stdout>,
     screen: Option<ScreenGuard>,
@@ -68,12 +83,16 @@ impl crate::private::Output for Output {
 impl crate::Textmode for Output {}
 
 impl Output {
+    /// Creates a new `Output` instance containing a
+    /// [`ScreenGuard`](ScreenGuard) instance.
     pub async fn new() -> Result<Self> {
         let mut self_ = Self::new_without_screen();
         self_.screen = Some(ScreenGuard::new().await?);
         Ok(self_)
     }
 
+    /// Creates a new `Output` instance without creating a
+    /// [`ScreenGuard`](ScreenGuard) instance.
     pub fn new_without_screen() -> Self {
         let (rows, cols) = match terminal_size::terminal_size() {
             Some((terminal_size::Width(w), terminal_size::Height(h))) => {
@@ -91,10 +110,17 @@ impl Output {
         }
     }
 
+    /// Removes the [`ScreenGuard`](ScreenGuard) instance stored in this
+    /// `Output` instance and returns it. This can be useful if you need to
+    /// manage the lifetime of the [`ScreenGuard`](ScreenGuard) instance
+    /// separately.
     pub fn take_screen_guard(&mut self) -> Option<ScreenGuard> {
         self.screen.take()
     }
 
+    /// Draws the in-memory screen to the terminal on `stdout`. This is done
+    /// using a diff mechanism to only update the parts of the terminal which
+    /// are different from the in-memory screen.
     pub async fn refresh(&mut self) -> Result<()> {
         let diff = self.next().screen().state_diff(self.cur().screen());
         write_stdout(&mut self.stdout, &diff).await?;
