@@ -184,6 +184,118 @@ fn run_input_test(
         }
         assert_no_more_lines(&mut r);
 
+        write(r.get_mut(), textmode::Key::String("🎉".to_string()));
+        if single {
+            if utf8 {
+                assert_line(&mut r, "Char('🎉'): [240, 159, 142, 137]");
+            } else {
+                assert_line(&mut r, "Byte(240): [240]");
+                assert_line(&mut r, "Byte(159): [159]");
+                assert_line(&mut r, "Byte(142): [142]");
+                assert_line(&mut r, "Byte(137): [137]");
+            }
+        } else {
+            if utf8 {
+                assert_line(&mut r, "String(\"🎉\"): [240, 159, 142, 137]");
+            } else {
+                assert_line(
+                    &mut r,
+                    "Bytes([240, 159, 142, 137]): [240, 159, 142, 137]",
+                );
+            }
+        }
+        assert_no_more_lines(&mut r);
+
+        write(r.get_mut(), textmode::Key::Bytes(vec![102, 111, 111, 240]));
+        if single {
+            if utf8 {
+                assert_line(&mut r, "Char('f'): [102]");
+                assert_line(&mut r, "Char('o'): [111]");
+                assert_line(&mut r, "Char('o'): [111]");
+            } else {
+                assert_line(&mut r, "Byte(102): [102]");
+                assert_line(&mut r, "Byte(111): [111]");
+                assert_line(&mut r, "Byte(111): [111]");
+                assert_line(&mut r, "Byte(240): [240]");
+            }
+        } else {
+            if utf8 {
+                assert_line(&mut r, "String(\"foo\"): [102, 111, 111]");
+            } else {
+                assert_line(
+                    &mut r,
+                    "Bytes([102, 111, 111, 240]): [102, 111, 111, 240]",
+                );
+            }
+        }
+        assert_no_more_lines(&mut r);
+        write(r.get_mut(), textmode::Key::Bytes(vec![159]));
+        if utf8 {
+            assert_no_more_lines(&mut r);
+        } else {
+            if single {
+                assert_line(&mut r, "Byte(159): [159]");
+            } else {
+                assert_line(&mut r, "Bytes([159]): [159]");
+            }
+        }
+        write(r.get_mut(), textmode::Key::Bytes(vec![142]));
+        if utf8 {
+            assert_no_more_lines(&mut r);
+        } else {
+            if single {
+                assert_line(&mut r, "Byte(142): [142]");
+            } else {
+                assert_line(&mut r, "Bytes([142]): [142]");
+            }
+        }
+        write(r.get_mut(), textmode::Key::Bytes(vec![137]));
+        if utf8 {
+            if single {
+                assert_line(&mut r, "Char('🎉'): [240, 159, 142, 137]");
+            } else {
+                assert_line(&mut r, "String(\"🎉\"): [240, 159, 142, 137]");
+            }
+        } else {
+            if single {
+                assert_line(&mut r, "Byte(137): [137]");
+            } else {
+                assert_line(&mut r, "Bytes([137]): [137]");
+            }
+        }
+        assert_no_more_lines(&mut r);
+
+        write(r.get_mut(), textmode::Key::Bytes(vec![240, 102, 111, 111]));
+        if utf8 {
+            if single {
+                assert_line(&mut r, "Byte(240): [240]");
+                assert_line(&mut r, "Char('f'): [102]");
+                assert_line(&mut r, "Char('o'): [111]");
+                assert_line(&mut r, "Char('o'): [111]");
+            } else {
+                // TODO: ideally this would be Bytes([240]) followed by
+                // String("foo") but figuring that out in a general way seems
+                // hard, and this is a pretty minor edge case
+                assert_line(
+                    &mut r,
+                    "Bytes([240, 102, 111, 111]): [240, 102, 111, 111]",
+                );
+            }
+        } else {
+            if single {
+                assert_line(&mut r, "Byte(240): [240]");
+                assert_line(&mut r, "Byte(102): [102]");
+                assert_line(&mut r, "Byte(111): [111]");
+                assert_line(&mut r, "Byte(111): [111]");
+            } else {
+                assert_line(
+                    &mut r,
+                    "Bytes([240, 102, 111, 111]): [240, 102, 111, 111]",
+                );
+            }
+        }
+        assert_no_more_lines(&mut r);
+
         write(r.get_mut(), textmode::Key::Ctrl(b'c'));
         if ctrl {
             assert_line(&mut r, "Ctrl(99): [3]");
