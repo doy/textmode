@@ -25,7 +25,7 @@ fn test_basic() {
 
 #[test]
 fn test_async() {
-    let mut fixture = fixtures::Fixture::new("async");
+    let mut fixture = fixtures::Fixture::new("basic");
     fixture.features("async");
     fixture.build().run(&[], |pty| {
         pty.write_all(b"a").unwrap();
