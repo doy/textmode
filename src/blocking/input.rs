@@ -209,12 +209,12 @@ impl Input {
         if self.parse_single {
             self.read_single_key()
         } else {
-            if let Some(s) = self.try_read_string()? {
-                return Ok(Some(s));
+            if let Some(key) = self.try_read_string()? {
+                return Ok(Some(key));
             }
 
-            if let Some(s) = self.try_read_bytes()? {
-                return Ok(Some(s));
+            if let Some(key) = self.try_read_bytes()? {
+                return Ok(Some(key));
             }
 
             if let Some(key) = self.read_single_key()? {
