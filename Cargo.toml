@@ -4,6 +4,13 @@ version = "0.1.0"
 authors = ["Jesse Luehrs <doy@tozt.net>"]
 edition = "2018"
 
+description = "terminal interaction library backed by a real terminal parser"
+repository = "https://git.tozt.net/textmode"
+readme = "README.md"
+keywords = ["curses", "vt100", "terminal", "tui"]
+categories = ["asynchronous", "command-line-interface"]
+license = "MIT"
+
 [dependencies]
 itoa = "0.4"
 nix = "0.20"
