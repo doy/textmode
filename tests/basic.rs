@@ -5,7 +5,8 @@ mod fixtures;
 
 #[test]
 fn test_basic() {
-    fixtures::run_fixture("basic", "", true, |pty| {
+    let fixture = fixtures::Fixture::new("basic");
+    fixture.build().run(&[], |pty| {
         pty.write_all(b"a").unwrap();
         assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
 
@@ -24,7 +25,9 @@ fn test_basic() {
 
 #[test]
 fn test_async() {
-    fixtures::run_fixture("async", "async", true, |pty| {
+    let mut fixture = fixtures::Fixture::new("async");
+    fixture.features("async");
+    fixture.build().run(&[], |pty| {
         pty.write_all(b"a").unwrap();
         assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
 
