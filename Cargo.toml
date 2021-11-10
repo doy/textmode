@@ -2,7 +2,7 @@
 name = "textmode"
 version = "0.1.0"
 authors = ["Jesse Luehrs <doy@tozt.net>"]
-edition = "2018"
+edition = "2021"
 
 description = "terminal interaction library backed by a real terminal parser"
 repository = "https://git.tozt.net/textmode"
