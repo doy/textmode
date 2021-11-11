@@ -69,6 +69,7 @@
 pub mod blocking;
 
 pub mod color;
+pub use vt100::Color;
 mod error;
 pub use error::{Error, Result};
 mod key;
