@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+* `hard_refresh` to fully redraw the screen
+
 ## [0.1.1] - 2021-11-10
 
 ### Changed

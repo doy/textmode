@@ -127,6 +127,18 @@ impl Output {
         self.cur_mut().process(&diff);
         Ok(())
     }
+
+    /// Draws the in-memory screen to the terminal on `stdout`. This clears
+    /// the screen and redraws it from scratch, rather than using a diff
+    /// mechanism like `refresh`. This can be useful when the current state of
+    /// the terminal screen is unknown, such as after the terminal has been
+    /// resized.
+    pub async fn hard_refresh(&mut self) -> Result<()> {
+        let contents = self.next().screen().state_formatted();
+        write_stdout(&mut self.stdout, &contents).await?;
+        self.cur_mut().process(&contents);
+        Ok(())
+    }
 }
 
 async fn write_stdout(
