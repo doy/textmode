@@ -14,7 +14,7 @@ async fn run(
     tm.move_to(8, 8);
     tm.set_fgcolor(textmode::color::GREEN);
     tm.write_str("bar");
-    tm.move_to(11, 11);
+    tm.move_relative(3, 0);
     tm.set_fgcolor(textmode::Color::Default);
     tm.write_str("baz");
     input.read_key().await?;
@@ -47,7 +47,7 @@ fn main() {
     tm.move_to(8, 8);
     tm.set_fgcolor(textmode::color::GREEN);
     tm.write_str("bar");
-    tm.move_to(11, 11);
+    tm.move_relative(3, 0);
     tm.set_fgcolor(textmode::Color::Default);
     tm.write_str("baz");
     input.read_key().unwrap();

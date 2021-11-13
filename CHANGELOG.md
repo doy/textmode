@@ -5,6 +5,7 @@
 ### Added
 
 * `hard_refresh` to fully redraw the screen
+* `move_relative` to move the cursor relative to its location
 
 ### Changed
 

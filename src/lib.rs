@@ -122,6 +122,31 @@ pub trait Textmode: private::Output {
         self.write(b"H");
     }
 
+    fn move_relative(&mut self, row_offset: i16, col_offset: i16) {
+        let abs_row_offset = row_offset.unsigned_abs();
+        let abs_col_offset = col_offset.unsigned_abs();
+        if row_offset > 0 {
+            self.write(b"\x1b[");
+            self.write_u16(abs_row_offset);
+            self.write(b"B")
+        }
+        if row_offset < 0 {
+            self.write(b"\x1b[");
+            self.write_u16(abs_row_offset);
+            self.write(b"A")
+        }
+        if col_offset > 0 {
+            self.write(b"\x1b[");
+            self.write_u16(abs_col_offset);
+            self.write(b"C")
+        }
+        if col_offset < 0 {
+            self.write(b"\x1b[");
+            self.write_u16(abs_col_offset);
+            self.write(b"D")
+        }
+    }
+
     /// Clears the in-memory screen.
     fn clear(&mut self) {
         self.write(b"\x1b[2J");
