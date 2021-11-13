@@ -180,8 +180,8 @@ pub trait Input {
 
         enum EscapeState {
             Escape,
-            CSI(Vec<u8>),
-            CKM,
+            Csi(Vec<u8>),
+            Ckm,
         }
 
         let mut state = EscapeState::Escape;
@@ -192,14 +192,14 @@ pub trait Input {
                 EscapeState::Escape => match c {
                     b'[' => {
                         if self.should_parse_special_keys() {
-                            state = EscapeState::CSI(vec![]);
+                            state = EscapeState::Csi(vec![]);
                         } else {
                             fail!()
                         }
                     }
                     b'O' => {
                         if self.should_parse_special_keys() {
-                            state = EscapeState::CKM;
+                            state = EscapeState::Ckm;
                         } else {
                             fail!()
                         }
@@ -213,7 +213,7 @@ pub trait Input {
                     }
                     _ => fail!(),
                 },
-                EscapeState::CSI(ref mut param) => match c {
+                EscapeState::Csi(ref mut param) => match c {
                     b'A' => return Ok(Some(crate::Key::Up)),
                     b'B' => return Ok(Some(crate::Key::Down)),
                     b'C' => return Ok(Some(crate::Key::Right)),
@@ -246,7 +246,7 @@ pub trait Input {
                     },
                     _ => fail!(),
                 },
-                EscapeState::CKM => match c {
+                EscapeState::Ckm => match c {
                     b'A' => return Ok(Some(crate::Key::KeypadUp)),
                     b'B' => return Ok(Some(crate::Key::KeypadDown)),
                     b'C' => return Ok(Some(crate::Key::KeypadRight)),

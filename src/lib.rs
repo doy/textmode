@@ -148,16 +148,14 @@ pub trait Textmode: private::Output {
                 if i < 8 {
                     self.write(b"\x1b[");
                     self.write_u8(30 + i);
-                    self.write(b"m");
                 } else if i < 16 {
                     self.write(b"\x1b[");
                     self.write_u8(82 + i);
-                    self.write(b"m");
                 } else {
                     self.write(b"\x1b[38;5;");
                     self.write_u8(i);
-                    self.write(b"m");
                 }
+                self.write(b"m");
             }
             vt100::Color::Rgb(r, g, b) => {
                 self.write(b"\x1b[38;2;");
@@ -182,16 +180,14 @@ pub trait Textmode: private::Output {
                 if i < 8 {
                     self.write(b"\x1b[");
                     self.write_u8(40 + i);
-                    self.write(b"m");
                 } else if i < 16 {
                     self.write(b"\x1b[");
                     self.write_u8(92 + i);
-                    self.write(b"m");
                 } else {
                     self.write(b"\x1b[48;5;");
                     self.write_u8(i);
-                    self.write(b"m");
                 }
+                self.write(b"m");
             }
             vt100::Color::Rgb(r, g, b) => {
                 self.write(b"\x1b[48;2;");
