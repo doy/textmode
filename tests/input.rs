@@ -58,6 +58,8 @@ fn test_async() {
     }
 }
 
+// the structure of the if statements here are easier to interpret uncollapsed
+#[allow(clippy::collapsible_else_if)]
 fn run_input_test(
     fixture: &mut fixtures::BuiltFixture,
     utf8: bool,
@@ -93,12 +95,11 @@ fn run_input_test(
             assert_line(&mut r, "Up: [27, 91, 65]");
         } else {
             if single {
+                assert_line(&mut r, "Byte(27): [27]");
                 if utf8 {
-                    assert_line(&mut r, "Byte(27): [27]");
                     assert_line(&mut r, "Char('['): [91]");
                     assert_line(&mut r, "Char('A'): [65]");
                 } else {
-                    assert_line(&mut r, "Byte(27): [27]");
                     assert_line(&mut r, "Byte(91): [91]");
                     assert_line(&mut r, "Byte(65): [65]");
                 }
