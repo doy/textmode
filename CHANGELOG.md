@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2] - 2021-12-06
+
+### Changed
+
+* bump deps
+
 ## [0.2.1] - 2021-12-05
 
 ### Changed
