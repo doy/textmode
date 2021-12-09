@@ -265,4 +265,13 @@ pub trait Textmode: private::Output {
             self.write(b"\x1b[27m");
         }
     }
+
+    /// Sets whether the cursor should be visible.
+    fn hide_cursor(&mut self, hide: bool) {
+        if hide {
+            self.write(b"\x1b[?25l");
+        } else {
+            self.write(b"\x1b[?25h");
+        }
+    }
 }

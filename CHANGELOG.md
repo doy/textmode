@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+* `hide_cursor` to hide or show the cursor
+
 ## [0.2.2] - 2021-12-06
 
 ### Changed
