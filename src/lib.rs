@@ -85,8 +85,8 @@ mod input;
 #[cfg(feature = "async")]
 pub use input::{Input, RawGuard};
 
-const INIT: &[u8] = b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
-const DEINIT: &[u8] = b"\x1b[?47l\x1b8\x1b[?25h";
+const INIT: &[u8] = b"\x1b7\x1b[?1007h\x1b[?47h\x1b[2J\x1b[H\x1b[?25h";
+const DEINIT: &[u8] = b"\x1b[?47l\x1b[?1007l\x1b8\x1b[?25h";
 
 /// Provides the methods used to manipulate the in-memory screen.
 pub trait Textmode: private::Output {
