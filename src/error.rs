@@ -1,18 +1,33 @@
 /// Type for errors returned by this crate.
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug)]
 pub enum Error {
     /// error reading from stdin
-    #[error("error reading from stdin")]
-    ReadStdin(#[source] std::io::Error),
+    ReadStdin(std::io::Error),
 
     /// error setting terminal mode
-    #[error("error setting terminal mode")]
-    SetTerminalMode(#[source] nix::Error),
+    SetTerminalMode(nix::Error),
 
     /// error writing to stdout
-    #[error("error writing to stdout")]
-    WriteStdout(#[source] std::io::Error),
+    WriteStdout(std::io::Error),
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ReadStdin(e) => {
+                write!(f, "error reading from stdin: {}", e)
+            }
+            Self::SetTerminalMode(e) => {
+                write!(f, "error setting terminal mode: {}", e)
+            }
+            Self::WriteStdout(e) => {
+                write!(f, "error writing to stdout: {}", e)
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 /// Convenience wrapper for a `Result` using `textmode::Error`.
 pub type Result<T> = std::result::Result<T, Error>;
