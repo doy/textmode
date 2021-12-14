@@ -15,11 +15,11 @@ impl RawGuard {
     /// [`Input::new`](Input::new).
     ///
     /// # Errors
-    /// * `Error::SetRaw`: failed to put the terminal into raw mode
+    /// * `Error::SetTerminalMode`: failed to put the terminal into raw mode
     pub fn new() -> crate::error::Result<Self> {
         let stdin = std::io::stdin().as_raw_fd();
         let termios = nix::sys::termios::tcgetattr(stdin)
-            .map_err(crate::error::Error::SetRaw)?;
+            .map_err(crate::error::Error::SetTerminalMode)?;
         let mut termios_raw = termios.clone();
         nix::sys::termios::cfmakeraw(&mut termios_raw);
         nix::sys::termios::tcsetattr(
@@ -27,7 +27,7 @@ impl RawGuard {
             nix::sys::termios::SetArg::TCSANOW,
             &termios_raw,
         )
-        .map_err(crate::error::Error::SetRaw)?;
+        .map_err(crate::error::Error::SetTerminalMode)?;
         Ok(Self {
             termios: Some(termios),
         })
@@ -36,7 +36,7 @@ impl RawGuard {
     /// Switch back from raw mode early.
     ///
     /// # Errors
-    /// * `Error::UnsetRaw`: failed to return the terminal from raw mode
+    /// * `Error::SetTerminalMode`: failed to return the terminal from raw mode
     pub fn cleanup(&mut self) -> crate::error::Result<()> {
         self.termios.take().map_or(Ok(()), |termios| {
             let stdin = std::io::stdin().as_raw_fd();
@@ -45,7 +45,7 @@ impl RawGuard {
                 nix::sys::termios::SetArg::TCSANOW,
                 &termios,
             )
-            .map_err(crate::error::Error::UnsetRaw)
+            .map_err(crate::error::Error::SetTerminalMode)
         })
     }
 }
@@ -133,7 +133,7 @@ impl Input {
     /// instance.
     ///
     /// # Errors
-    /// * `Error::SetRaw`: failed to put the terminal into raw mode
+    /// * `Error::SetTerminalMode`: failed to put the terminal into raw mode
     pub fn new() -> crate::error::Result<Self> {
         let mut self_ = Self::new_without_raw();
         self_.raw = Some(RawGuard::new()?);

@@ -6,6 +6,11 @@
 
 * `hide_cursor` to hide or show the cursor
 
+### Changed
+
+* combined `Error::SetRaw` and `Error::UnsetRaw` into a single
+  `Error::SetTerminalMode` variant
+
 ## [0.2.2] - 2021-12-06
 
 ### Changed

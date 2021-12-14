@@ -5,13 +5,9 @@ pub enum Error {
     #[error("error reading from stdin")]
     ReadStdin(#[source] std::io::Error),
 
-    /// error enabling terminal raw mode
-    #[error("error enabling terminal raw mode")]
-    SetRaw(#[source] nix::Error),
-
-    /// error restoring terminal from raw mode
-    #[error("error restoring terminal from raw mode")]
-    UnsetRaw(#[source] nix::Error),
+    /// error setting terminal mode
+    #[error("error setting terminal mode")]
+    SetTerminalMode(#[source] nix::Error),
 
     /// error writing to stdout
     #[error("error writing to stdout")]
