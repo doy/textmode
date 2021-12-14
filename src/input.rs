@@ -1,5 +1,3 @@
-use crate::error::*;
-
 use futures_lite::io::AsyncReadExt as _;
 use std::os::unix::io::AsRawFd as _;
 
@@ -15,10 +13,14 @@ impl RawGuard {
     /// Switches the terminal on `stdin` to raw mode and returns a guard
     /// object. This is typically called as part of
     /// [`Input::new`](Input::new).
-    pub async fn new() -> Result<Self> {
+    ///
+    /// # Errors
+    /// * `Error::SetRaw`: failed to put the terminal into raw mode
+    pub async fn new() -> crate::error::Result<Self> {
         let stdin = std::io::stdin().as_raw_fd();
         let termios = blocking::unblock(move || {
-            nix::sys::termios::tcgetattr(stdin).map_err(Error::SetRaw)
+            nix::sys::termios::tcgetattr(stdin)
+                .map_err(crate::error::Error::SetRaw)
         })
         .await?;
         let mut termios_raw = termios.clone();
@@ -29,7 +31,7 @@ impl RawGuard {
                 nix::sys::termios::SetArg::TCSANOW,
                 &termios_raw,
             )
-            .map_err(Error::SetRaw)
+            .map_err(crate::error::Error::SetRaw)
         })
         .await?;
         Ok(Self {
@@ -38,7 +40,10 @@ impl RawGuard {
     }
 
     /// Switch back from raw mode early.
-    pub async fn cleanup(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    /// * `Error::UnsetRaw`: failed to return the terminal from raw mode
+    pub async fn cleanup(&mut self) -> crate::error::Result<()> {
         if let Some(termios) = self.termios.take() {
             let stdin = std::io::stdin().as_raw_fd();
             blocking::unblock(move || {
@@ -47,7 +52,7 @@ impl RawGuard {
                     nix::sys::termios::SetArg::TCSANOW,
                     &termios,
                 )
-                .map_err(Error::UnsetRaw)
+                .map_err(crate::error::Error::UnsetRaw)
             })
             .await
         } else {
@@ -62,6 +67,8 @@ impl Drop for RawGuard {
     /// call `cleanup` manually instead.
     fn drop(&mut self) {
         futures_lite::future::block_on(async {
+            // https://github.com/rust-lang/rust-clippy/issues/8003
+            #[allow(clippy::let_underscore_drop)]
             let _ = self.cleanup().await;
         });
     }
@@ -89,11 +96,11 @@ pub struct Input {
 
 impl crate::private::Input for Input {
     fn buf(&self) -> &[u8] {
-        &self.buf[self.pos..]
+        self.buf.get(self.pos..).unwrap()
     }
 
     fn buf_mut(&mut self) -> &mut [u8] {
-        &mut self.buf[self.pos..]
+        self.buf.get_mut(self.pos..).unwrap()
     }
 
     fn buf_mut_vec(&mut self) -> &mut Vec<u8> {
@@ -140,7 +147,10 @@ impl crate::private::Input for Input {
 impl Input {
     /// Creates a new `Input` instance containing a [`RawGuard`](RawGuard)
     /// instance.
-    pub async fn new() -> Result<Self> {
+    ///
+    /// # Errors
+    /// * `Error::SetRaw`: failed to put the terminal into raw mode
+    pub async fn new() -> crate::error::Result<Self> {
         let mut self_ = Self::new_without_raw();
         self_.raw = Some(RawGuard::new().await?);
         Ok(self_)
@@ -148,6 +158,7 @@ impl Input {
 
     /// Creates a new `Input` instance without creating a
     /// [`RawGuard`](RawGuard) instance.
+    #[must_use]
     pub fn new_without_raw() -> Self {
         Self {
             stdin: blocking::Unblock::new(std::io::stdin()),
@@ -217,7 +228,12 @@ impl Input {
 
     /// Reads a keypress from the terminal on `stdin`. Returns `Ok(None)` on
     /// EOF.
-    pub async fn read_key(&mut self) -> Result<Option<crate::Key>> {
+    ///
+    /// # Errors
+    /// * `Error::ReadStdin`: failed to read data from stdin
+    pub async fn read_key(
+        &mut self,
+    ) -> crate::error::Result<Option<crate::Key>> {
         self.fill_buf().await?;
 
         if self.parse_single {
@@ -239,7 +255,7 @@ impl Input {
         }
     }
 
-    async fn fill_buf(&mut self) -> Result<()> {
+    async fn fill_buf(&mut self) -> crate::error::Result<()> {
         if self.buf_is_empty() {
             self.buf.resize(4096, 0);
             self.pos = 0;
@@ -251,14 +267,17 @@ impl Input {
         }
 
         if self.parse_utf8 {
-            let expected_bytes = self.expected_leading_utf8_bytes();
+            let expected_bytes =
+                self.expected_leading_utf8_bytes(*self.buf().get(0).unwrap());
             if self.buf.len() < self.pos + expected_bytes {
                 let mut cur = self.buf.len();
                 self.buf.resize(4096 + expected_bytes, 0);
                 while cur < self.pos + expected_bytes {
-                    let bytes =
-                        read_stdin(&mut self.stdin, &mut self.buf[cur..])
-                            .await?;
+                    let bytes = read_stdin(
+                        &mut self.stdin,
+                        self.buf.get_mut(cur..).unwrap(),
+                    )
+                    .await?;
                     if bytes == 0 {
                         return Ok(());
                     }
@@ -275,6 +294,9 @@ impl Input {
 async fn read_stdin(
     stdin: &mut blocking::Unblock<std::io::Stdin>,
     buf: &mut [u8],
-) -> Result<usize> {
-    stdin.read(buf).await.map_err(Error::ReadStdin)
+) -> crate::error::Result<usize> {
+    stdin
+        .read(buf)
+        .await
+        .map_err(crate::error::Error::ReadStdin)
 }

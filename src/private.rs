@@ -5,13 +5,13 @@ pub trait Output {
     fn next_mut(&mut self) -> &mut vt100::Parser;
 
     fn write_u16(&mut self, i: u16) {
-        // unwrap is fine because vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap();
+        // vt100::Parser::write can never fail
+        itoa::write(self.next_mut(), i).unwrap_or_else(|_| unreachable!());
     }
 
     fn write_u8(&mut self, i: u8) {
-        // unwrap is fine because vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap();
+        // vt100::Parser::write can never fail
+        itoa::write(self.next_mut(), i).unwrap_or_else(|_| unreachable!());
     }
 }
 
@@ -54,13 +54,12 @@ pub trait Input {
                                 self.consume(i);
                                 s.truncate(i);
                                 return Some(crate::Key::String(s));
-                            } else {
-                                // not quite correct, but figuring out how to
-                                // take only the invalid utf8 seems hard (and
-                                // this should come up very rarely)
-                                self.consume(prefix.len());
-                                return Some(crate::Key::Bytes(prefix));
                             }
+                            // not quite correct, but figuring out how to
+                            // take only the invalid utf8 seems hard (and
+                            // this should come up very rarely)
+                            self.consume(prefix.len());
+                            return Some(crate::Key::Bytes(prefix));
                         }
                     }
                     self.consume(s.len());
@@ -73,6 +72,7 @@ pub trait Input {
     }
 
     fn try_read_bytes(&mut self) -> Option<crate::Key> {
+        #[allow(clippy::match_same_arms)]
         let prefix: Vec<_> = self
             .buf()
             .iter()
@@ -129,7 +129,7 @@ pub trait Input {
             Some(c @ 28..=31) => Some(crate::Key::Byte(c)),
             Some(c @ 32..=126) => {
                 if self.should_parse_utf8() {
-                    Some(crate::Key::Char(c as char))
+                    Some(crate::Key::Char(char::from(c)))
                 } else {
                     Some(crate::Key::Byte(c))
                 }
@@ -153,6 +153,12 @@ pub trait Input {
     }
 
     fn read_escape_sequence(&mut self) -> Option<crate::Key> {
+        enum EscapeState {
+            Escape,
+            Csi(Vec<u8>),
+            Ckm,
+        }
+
         let mut seen = vec![b'\x1b'];
 
         macro_rules! fail {
@@ -162,9 +168,8 @@ pub trait Input {
                 }
                 if self.should_parse_special_keys() {
                     return Some(crate::Key::Escape);
-                } else {
-                    return Some(crate::Key::Byte(27));
                 }
+                return Some(crate::Key::Byte(27));
             }};
         }
         macro_rules! next_byte {
@@ -176,12 +181,6 @@ pub trait Input {
                     }
                 }
             };
-        }
-
-        enum EscapeState {
-            Escape,
-            Csi(Vec<u8>),
-            Ckm,
         }
 
         let mut state = EscapeState::Escape;
@@ -207,9 +206,8 @@ pub trait Input {
                     b' '..=b'N' | b'P'..=b'Z' | b'\\'..=b'~' => {
                         if self.should_parse_meta() {
                             return Some(crate::Key::Meta(c));
-                        } else {
-                            fail!()
                         }
+                        fail!()
                     }
                     _ => fail!(),
                 },
@@ -306,11 +304,12 @@ pub trait Input {
         }
 
         match std::string::String::from_utf8(buf) {
-            // unwrap is fine because buf always contains at least the
-            // initial character, and we have already done the parsing to
-            // ensure that it contains a valid utf8 character before
-            // getting here
-            Ok(s) => Some(crate::Key::Char(s.chars().next().unwrap())),
+            Ok(s) => Some(crate::Key::Char(
+                // buf always contains at least the initial character, and we
+                // have already done the parsing to ensure that it contains a
+                // valid utf8 character before getting here
+                s.chars().next().unwrap_or_else(|| unreachable!()),
+            )),
             Err(e) => {
                 buf = e.into_bytes();
                 fail!()
@@ -319,12 +318,10 @@ pub trait Input {
     }
 
     fn getc(&mut self) -> Option<u8> {
-        if self.buf_is_empty() {
-            return None;
-        }
-        let c = self.buf()[0];
-        self.consume(1);
-        Some(c)
+        self.buf().get(0).copied().map(|c| {
+            self.consume(1);
+            c
+        })
     }
 
     fn ungetc(&mut self, c: u8) {
@@ -332,12 +329,13 @@ pub trait Input {
             self.buf_mut_vec().insert(0, c);
         } else {
             self.unconsume(1);
-            self.buf_mut()[0] = c;
+            *self.buf_mut().get_mut(0).unwrap() = c;
         }
     }
 
-    fn expected_leading_utf8_bytes(&self) -> usize {
-        match self.buf()[0] {
+    #[allow(clippy::match_same_arms)]
+    fn expected_leading_utf8_bytes(&self, c: u8) -> usize {
+        match c {
             0b0000_0000..=0b0111_1111 => 1,
             0b1100_0000..=0b1101_1111 => 2,
             0b1110_0000..=0b1110_1111 => 3,

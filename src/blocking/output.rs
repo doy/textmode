@@ -1,5 +1,3 @@
-use crate::error::*;
-
 use std::io::Write as _;
 
 use crate::private::Output as _;
@@ -14,13 +12,19 @@ impl ScreenGuard {
     /// Switches the terminal on `stdout` to alternate screen mode and returns
     /// a guard object. This is typically called as part of
     /// [`Output::new`](Output::new).
-    pub fn new() -> Result<Self> {
+    ///
+    /// # Errors
+    /// * `Error::WriteStdout`: failed to write initialization to stdout
+    pub fn new() -> crate::error::Result<Self> {
         write_stdout(crate::INIT)?;
         Ok(Self { cleaned_up: false })
     }
 
     /// Switch back from alternate screen mode early.
-    pub fn cleanup(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    /// * `Error::WriteStdout`: failed to write deinitialization to stdout
+    pub fn cleanup(&mut self) -> crate::error::Result<()> {
         if self.cleaned_up {
             return Ok(());
         }
@@ -32,6 +36,8 @@ impl ScreenGuard {
 impl Drop for ScreenGuard {
     /// Calls `cleanup`.
     fn drop(&mut self) {
+        // https://github.com/rust-lang/rust-clippy/issues/8003
+        #[allow(clippy::let_underscore_drop)]
         let _ = self.cleanup();
     }
 }
@@ -72,7 +78,10 @@ impl crate::Textmode for Output {}
 impl Output {
     /// Creates a new `Output` instance containing a
     /// [`ScreenGuard`](ScreenGuard) instance.
-    pub fn new() -> Result<Self> {
+    ///
+    /// # Errors
+    /// * `Error::WriteStdout`: failed to write initialization to stdout
+    pub fn new() -> crate::error::Result<Self> {
         let mut self_ = Self::new_without_screen();
         self_.screen = Some(ScreenGuard::new()?);
         Ok(self_)
@@ -80,6 +89,7 @@ impl Output {
 
     /// Creates a new `Output` instance without creating a
     /// [`ScreenGuard`](ScreenGuard) instance.
+    #[must_use]
     pub fn new_without_screen() -> Self {
         let (rows, cols) = match terminal_size::terminal_size() {
             Some((terminal_size::Width(w), terminal_size::Height(h))) => {
@@ -108,7 +118,10 @@ impl Output {
     /// Draws the in-memory screen to the terminal on `stdout`. This is done
     /// using a diff mechanism to only update the parts of the terminal which
     /// are different from the in-memory screen.
-    pub fn refresh(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    /// * `Error::WriteStdout`: failed to write screen state to stdout
+    pub fn refresh(&mut self) -> crate::error::Result<()> {
         let diff = self.next().screen().state_diff(self.cur().screen());
         write_stdout(&diff)?;
         self.cur_mut().process(&diff);
@@ -120,7 +133,10 @@ impl Output {
     /// mechanism like `refresh`. This can be useful when the current state of
     /// the terminal screen is unknown, such as after the terminal has been
     /// resized.
-    pub async fn hard_refresh(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    /// * `Error::WriteStdout`: failed to write screen state to stdout
+    pub async fn hard_refresh(&mut self) -> crate::error::Result<()> {
         let contents = self.next().screen().state_formatted();
         write_stdout(&contents)?;
         self.cur_mut().process(&contents);
@@ -128,9 +144,11 @@ impl Output {
     }
 }
 
-fn write_stdout(buf: &[u8]) -> Result<()> {
+fn write_stdout(buf: &[u8]) -> crate::error::Result<()> {
     let mut stdout = std::io::stdout();
-    stdout.write_all(buf).map_err(Error::WriteStdout)?;
-    stdout.flush().map_err(Error::WriteStdout)?;
+    stdout
+        .write_all(buf)
+        .map_err(crate::error::Error::WriteStdout)?;
+    stdout.flush().map_err(crate::error::Error::WriteStdout)?;
     Ok(())
 }

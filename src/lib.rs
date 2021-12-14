@@ -1,5 +1,3 @@
-#![allow(clippy::collapsible_if)]
-
 //! `textmode` is a library for terminal interaction built on top of a real
 //! terminal parsing library. It allows you to do arbitrary drawing operations
 //! on an in-memory screen, and then update the visible terminal output to
@@ -65,6 +63,19 @@
 //! Additionally, the [`blocking`] module provides an equivalent interface
 //! with blocking calls instead of async.
 
+#![warn(clippy::cargo)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+#![warn(clippy::unwrap_used)]
+#![warn(clippy::expect_used)]
+#![warn(clippy::indexing_slicing)]
+#![warn(clippy::as_conversions)]
+#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::missing_const_for_fn)]
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::too_many_lines)]
+
 /// Blocking interface.
 pub mod blocking;
 
@@ -128,22 +139,22 @@ pub trait Textmode: private::Output {
         if row_offset > 0 {
             self.write(b"\x1b[");
             self.write_u16(abs_row_offset);
-            self.write(b"B")
+            self.write(b"B");
         }
         if row_offset < 0 {
             self.write(b"\x1b[");
             self.write_u16(abs_row_offset);
-            self.write(b"A")
+            self.write(b"A");
         }
         if col_offset > 0 {
             self.write(b"\x1b[");
             self.write_u16(abs_col_offset);
-            self.write(b"C")
+            self.write(b"C");
         }
         if col_offset < 0 {
             self.write(b"\x1b[");
             self.write_u16(abs_col_offset);
-            self.write(b"D")
+            self.write(b"D");
         }
     }
 
