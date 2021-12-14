@@ -221,17 +221,17 @@ impl Input {
         self.fill_buf().await?;
 
         if self.parse_single {
-            self.read_single_key()
+            Ok(self.read_single_key())
         } else {
-            if let Some(key) = self.try_read_string()? {
+            if let Some(key) = self.try_read_string() {
                 return Ok(Some(key));
             }
 
-            if let Some(key) = self.try_read_bytes()? {
+            if let Some(key) = self.try_read_bytes() {
                 return Ok(Some(key));
             }
 
-            if let Some(key) = self.read_single_key()? {
+            if let Some(key) = self.read_single_key() {
                 return Ok(Some(self.normalize_to_bytes(key)));
             }
 

@@ -30,9 +30,9 @@ pub trait Input {
     fn should_parse_special_keys(&self) -> bool;
     fn should_parse_single(&self) -> bool;
 
-    fn try_read_string(&mut self) -> crate::Result<Option<crate::Key>> {
+    fn try_read_string(&mut self) -> Option<crate::Key> {
         if !self.should_parse_utf8() {
-            return Ok(None);
+            return None;
         }
 
         let prefix: Vec<_> = self
@@ -45,7 +45,7 @@ pub trait Input {
             match std::string::String::from_utf8_lossy(&prefix) {
                 std::borrow::Cow::Borrowed(s) => {
                     self.consume(s.len());
-                    return Ok(Some(crate::Key::String(s.to_string())));
+                    return Some(crate::Key::String(s.to_string()));
                 }
                 std::borrow::Cow::Owned(mut s) => {
                     for (i, window) in s.as_bytes().windows(3).enumerate() {
@@ -53,26 +53,26 @@ pub trait Input {
                             if i > 0 {
                                 self.consume(i);
                                 s.truncate(i);
-                                return Ok(Some(crate::Key::String(s)));
+                                return Some(crate::Key::String(s));
                             } else {
                                 // not quite correct, but figuring out how to
                                 // take only the invalid utf8 seems hard (and
                                 // this should come up very rarely)
                                 self.consume(prefix.len());
-                                return Ok(Some(crate::Key::Bytes(prefix)));
+                                return Some(crate::Key::Bytes(prefix));
                             }
                         }
                     }
                     self.consume(s.len());
-                    return Ok(Some(crate::Key::String(s)));
+                    return Some(crate::Key::String(s));
                 }
             }
         }
 
-        Ok(None)
+        None
     }
 
-    fn try_read_bytes(&mut self) -> crate::Result<Option<crate::Key>> {
+    fn try_read_bytes(&mut self) -> Option<crate::Key> {
         let prefix: Vec<_> = self
             .buf()
             .iter()
@@ -93,10 +93,10 @@ pub trait Input {
             .collect();
         if !prefix.is_empty() {
             self.consume(prefix.len());
-            return Ok(Some(crate::Key::Bytes(prefix)));
+            return Some(crate::Key::Bytes(prefix));
         }
 
-        Ok(None)
+        None
     }
 
     fn normalize_to_bytes(&self, key: crate::Key) -> crate::Key {
@@ -107,14 +107,14 @@ pub trait Input {
         }
     }
 
-    fn read_single_key(&mut self) -> crate::Result<Option<crate::Key>> {
+    fn read_single_key(&mut self) -> Option<crate::Key> {
         match self.getc() {
-            Some(0) => Ok(Some(crate::Key::Byte(0))),
+            Some(0) => Some(crate::Key::Byte(0)),
             Some(c @ 1..=26) => {
                 if self.should_parse_ctrl() {
-                    Ok(Some(crate::Key::Ctrl(b'a' + c - 1)))
+                    Some(crate::Key::Ctrl(b'a' + c - 1))
                 } else {
-                    Ok(Some(crate::Key::Byte(c)))
+                    Some(crate::Key::Byte(c))
                 }
             }
             Some(27) => {
@@ -123,36 +123,36 @@ pub trait Input {
                 {
                     self.read_escape_sequence()
                 } else {
-                    Ok(Some(crate::Key::Byte(27)))
+                    Some(crate::Key::Byte(27))
                 }
             }
-            Some(c @ 28..=31) => Ok(Some(crate::Key::Byte(c))),
+            Some(c @ 28..=31) => Some(crate::Key::Byte(c)),
             Some(c @ 32..=126) => {
                 if self.should_parse_utf8() {
-                    Ok(Some(crate::Key::Char(c as char)))
+                    Some(crate::Key::Char(c as char))
                 } else {
-                    Ok(Some(crate::Key::Byte(c)))
+                    Some(crate::Key::Byte(c))
                 }
             }
             Some(127) => {
                 if self.should_parse_special_keys() {
-                    Ok(Some(crate::Key::Backspace))
+                    Some(crate::Key::Backspace)
                 } else {
-                    Ok(Some(crate::Key::Byte(127)))
+                    Some(crate::Key::Byte(127))
                 }
             }
             Some(c @ 128..=255) => {
                 if self.should_parse_utf8() {
                     self.read_utf8_char(c)
                 } else {
-                    Ok(Some(crate::Key::Byte(c)))
+                    Some(crate::Key::Byte(c))
                 }
             }
-            None => Ok(None),
+            None => None,
         }
     }
 
-    fn read_escape_sequence(&mut self) -> crate::Result<Option<crate::Key>> {
+    fn read_escape_sequence(&mut self) -> Option<crate::Key> {
         let mut seen = vec![b'\x1b'];
 
         macro_rules! fail {
@@ -161,9 +161,9 @@ pub trait Input {
                     self.ungetc(c);
                 }
                 if self.should_parse_special_keys() {
-                    return Ok(Some(crate::Key::Escape));
+                    return Some(crate::Key::Escape);
                 } else {
-                    return Ok(Some(crate::Key::Byte(27)));
+                    return Some(crate::Key::Byte(27));
                 }
             }};
         }
@@ -206,7 +206,7 @@ pub trait Input {
                     }
                     b' '..=b'N' | b'P'..=b'Z' | b'\\'..=b'~' => {
                         if self.should_parse_meta() {
-                            return Ok(Some(crate::Key::Meta(c)));
+                            return Some(crate::Key::Meta(c));
                         } else {
                             fail!()
                         }
@@ -214,57 +214,54 @@ pub trait Input {
                     _ => fail!(),
                 },
                 EscapeState::Csi(ref mut param) => match c {
-                    b'A' => return Ok(Some(crate::Key::Up)),
-                    b'B' => return Ok(Some(crate::Key::Down)),
-                    b'C' => return Ok(Some(crate::Key::Right)),
-                    b'D' => return Ok(Some(crate::Key::Left)),
-                    b'H' => return Ok(Some(crate::Key::Home)),
-                    b'F' => return Ok(Some(crate::Key::End)),
+                    b'A' => return Some(crate::Key::Up),
+                    b'B' => return Some(crate::Key::Down),
+                    b'C' => return Some(crate::Key::Right),
+                    b'D' => return Some(crate::Key::Left),
+                    b'H' => return Some(crate::Key::Home),
+                    b'F' => return Some(crate::Key::End),
                     b'0'..=b'9' => param.push(c),
                     b'~' => match param.as_slice() {
-                        [b'2'] => return Ok(Some(crate::Key::Insert)),
-                        [b'3'] => return Ok(Some(crate::Key::Delete)),
-                        [b'5'] => return Ok(Some(crate::Key::PageUp)),
-                        [b'6'] => return Ok(Some(crate::Key::PageDown)),
-                        [b'1', b'5'] => return Ok(Some(crate::Key::F(5))),
-                        [b'1', b'7'] => return Ok(Some(crate::Key::F(6))),
-                        [b'1', b'8'] => return Ok(Some(crate::Key::F(7))),
-                        [b'1', b'9'] => return Ok(Some(crate::Key::F(8))),
-                        [b'2', b'0'] => return Ok(Some(crate::Key::F(9))),
-                        [b'2', b'1'] => return Ok(Some(crate::Key::F(10))),
-                        [b'2', b'3'] => return Ok(Some(crate::Key::F(11))),
-                        [b'2', b'4'] => return Ok(Some(crate::Key::F(12))),
-                        [b'2', b'5'] => return Ok(Some(crate::Key::F(13))),
-                        [b'2', b'6'] => return Ok(Some(crate::Key::F(14))),
-                        [b'2', b'8'] => return Ok(Some(crate::Key::F(15))),
-                        [b'2', b'9'] => return Ok(Some(crate::Key::F(16))),
-                        [b'3', b'1'] => return Ok(Some(crate::Key::F(17))),
-                        [b'3', b'2'] => return Ok(Some(crate::Key::F(18))),
-                        [b'3', b'3'] => return Ok(Some(crate::Key::F(19))),
-                        [b'3', b'4'] => return Ok(Some(crate::Key::F(20))),
+                        [b'2'] => return Some(crate::Key::Insert),
+                        [b'3'] => return Some(crate::Key::Delete),
+                        [b'5'] => return Some(crate::Key::PageUp),
+                        [b'6'] => return Some(crate::Key::PageDown),
+                        [b'1', b'5'] => return Some(crate::Key::F(5)),
+                        [b'1', b'7'] => return Some(crate::Key::F(6)),
+                        [b'1', b'8'] => return Some(crate::Key::F(7)),
+                        [b'1', b'9'] => return Some(crate::Key::F(8)),
+                        [b'2', b'0'] => return Some(crate::Key::F(9)),
+                        [b'2', b'1'] => return Some(crate::Key::F(10)),
+                        [b'2', b'3'] => return Some(crate::Key::F(11)),
+                        [b'2', b'4'] => return Some(crate::Key::F(12)),
+                        [b'2', b'5'] => return Some(crate::Key::F(13)),
+                        [b'2', b'6'] => return Some(crate::Key::F(14)),
+                        [b'2', b'8'] => return Some(crate::Key::F(15)),
+                        [b'2', b'9'] => return Some(crate::Key::F(16)),
+                        [b'3', b'1'] => return Some(crate::Key::F(17)),
+                        [b'3', b'2'] => return Some(crate::Key::F(18)),
+                        [b'3', b'3'] => return Some(crate::Key::F(19)),
+                        [b'3', b'4'] => return Some(crate::Key::F(20)),
                         _ => fail!(),
                     },
                     _ => fail!(),
                 },
                 EscapeState::Ckm => match c {
-                    b'A' => return Ok(Some(crate::Key::KeypadUp)),
-                    b'B' => return Ok(Some(crate::Key::KeypadDown)),
-                    b'C' => return Ok(Some(crate::Key::KeypadRight)),
-                    b'D' => return Ok(Some(crate::Key::KeypadLeft)),
-                    b'P' => return Ok(Some(crate::Key::F(1))),
-                    b'Q' => return Ok(Some(crate::Key::F(2))),
-                    b'R' => return Ok(Some(crate::Key::F(3))),
-                    b'S' => return Ok(Some(crate::Key::F(4))),
+                    b'A' => return Some(crate::Key::KeypadUp),
+                    b'B' => return Some(crate::Key::KeypadDown),
+                    b'C' => return Some(crate::Key::KeypadRight),
+                    b'D' => return Some(crate::Key::KeypadLeft),
+                    b'P' => return Some(crate::Key::F(1)),
+                    b'Q' => return Some(crate::Key::F(2)),
+                    b'R' => return Some(crate::Key::F(3)),
+                    b'S' => return Some(crate::Key::F(4)),
                     _ => fail!(),
                 },
             }
         }
     }
 
-    fn read_utf8_char(
-        &mut self,
-        initial: u8,
-    ) -> crate::Result<Option<crate::Key>> {
+    fn read_utf8_char(&mut self, initial: u8) -> Option<crate::Key> {
         let mut buf = vec![initial];
 
         macro_rules! fail {
@@ -272,7 +269,7 @@ pub trait Input {
                 for &c in buf.iter().skip(1).rev() {
                     self.ungetc(c);
                 }
-                return Ok(Some(crate::Key::Byte(initial)));
+                return Some(crate::Key::Byte(initial));
             }};
         }
         macro_rules! next_byte {
@@ -286,7 +283,7 @@ pub trait Input {
                             fail!()
                         }
                     }
-                    None => return Ok(None),
+                    None => return None,
                 }
             };
         }
@@ -313,7 +310,7 @@ pub trait Input {
             // initial character, and we have already done the parsing to
             // ensure that it contains a valid utf8 character before
             // getting here
-            Ok(s) => Ok(Some(crate::Key::Char(s.chars().next().unwrap()))),
+            Ok(s) => Some(crate::Key::Char(s.chars().next().unwrap())),
             Err(e) => {
                 buf = e.into_bytes();
                 fail!()
