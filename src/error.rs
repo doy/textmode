@@ -27,7 +27,14 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ReadStdin(e) | Self::WriteStdout(e) => Some(e),
+            Self::SetTerminalMode(e) => Some(e),
+        }
+    }
+}
 
 /// Convenience wrapper for a `Result` using `textmode::Error`.
 pub type Result<T> = std::result::Result<T, Error>;
