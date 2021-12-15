@@ -5,13 +5,13 @@ pub trait Output {
     fn next_mut(&mut self) -> &mut vt100::Parser;
 
     fn write_u16(&mut self, i: u16) {
-        // vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap();
+        let mut itoa_buf = itoa::Buffer::new();
+        self.next_mut().process(itoa_buf.format(i).as_bytes());
     }
 
     fn write_u8(&mut self, i: u8) {
-        // vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap();
+        let mut itoa_buf = itoa::Buffer::new();
+        self.next_mut().process(itoa_buf.format(i).as_bytes());
     }
 }
 
