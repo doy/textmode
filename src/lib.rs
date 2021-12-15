@@ -74,6 +74,7 @@
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::too_many_lines)]
+#![allow(clippy::type_complexity)]
 
 /// Blocking interface.
 pub mod blocking;
