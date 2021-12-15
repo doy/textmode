@@ -6,12 +6,12 @@ pub trait Output {
 
     fn write_u16(&mut self, i: u16) {
         // vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap_or_else(|_| unreachable!());
+        itoa::write(self.next_mut(), i).unwrap();
     }
 
     fn write_u8(&mut self, i: u8) {
         // vt100::Parser::write can never fail
-        itoa::write(self.next_mut(), i).unwrap_or_else(|_| unreachable!());
+        itoa::write(self.next_mut(), i).unwrap();
     }
 }
 
@@ -308,7 +308,7 @@ pub trait Input {
                 // buf always contains at least the initial character, and we
                 // have already done the parsing to ensure that it contains a
                 // valid utf8 character before getting here
-                s.chars().next().unwrap_or_else(|| unreachable!()),
+                s.chars().next().unwrap(),
             )),
             Err(e) => {
                 buf = e.into_bytes();
@@ -329,7 +329,7 @@ pub trait Input {
             self.buf_mut_vec().insert(0, c);
         } else {
             self.unconsume(1);
-            *self.buf_mut().get_mut(0).unwrap() = c;
+            self.buf_mut()[0] = c;
         }
     }
 

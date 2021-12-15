@@ -80,11 +80,11 @@ pub struct Input {
 
 impl crate::private::Input for Input {
     fn buf(&self) -> &[u8] {
-        self.buf.get(self.pos..).unwrap()
+        &self.buf[self.pos..]
     }
 
     fn buf_mut(&mut self) -> &mut [u8] {
-        self.buf.get_mut(self.pos..).unwrap()
+        &mut self.buf[self.pos..]
     }
 
     fn buf_mut_vec(&mut self) -> &mut Vec<u8> {
@@ -249,12 +249,12 @@ impl Input {
 
         if self.parse_utf8 {
             let expected_bytes =
-                self.expected_leading_utf8_bytes(*self.buf().get(0).unwrap());
+                self.expected_leading_utf8_bytes(self.buf()[0]);
             if self.buf.len() < self.pos + expected_bytes {
                 let mut cur = self.buf.len();
                 self.buf.resize(4096 + expected_bytes, 0);
                 while cur < self.pos + expected_bytes {
-                    let bytes = read_stdin(self.buf.get_mut(cur..).unwrap())?;
+                    let bytes = read_stdin(&mut self.buf[cur..])?;
                     if bytes == 0 {
                         return Ok(());
                     }
