@@ -15,7 +15,7 @@ license = "MIT"
 itoa = "1.0.1"
 nix = "0.23.0"
 terminal_size = "0.1.17"
-vt100 = "0.14.0"
+vt100 = "0.15.0"
 
 blocking = { version = "1.1.0", optional = true }
 futures-lite = { version = "1.12.0", optional = true }
@@ -27,7 +27,7 @@ async = ["blocking", "futures-lite"]
 [dev-dependencies]
 assert_cmd = "2.0.2"
 assert_fs = "1.0.6"
-escargot = "0.5.6"
+escargot = "0.5.7"
 libc = "0.2.112"
-pty-process = { version = "0.1.1", features = ["backend-smol"] }
+pty-process = { version = "0.2.0", features = ["backend-smol"] }
 smol = "1.2.5"
