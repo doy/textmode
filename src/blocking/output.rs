@@ -136,7 +136,7 @@ impl Output {
     ///
     /// # Errors
     /// * `Error::WriteStdout`: failed to write screen state to stdout
-    pub async fn hard_refresh(&mut self) -> crate::error::Result<()> {
+    pub fn hard_refresh(&mut self) -> crate::error::Result<()> {
         let contents = self.next().screen().state_formatted();
         write_stdout(&contents)?;
         self.cur_mut().process(&contents);
