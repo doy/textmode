@@ -27,10 +27,13 @@ async = ["tokio"]
 [dev-dependencies]
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
+bytes = "1.1.0"
 escargot = "0.5.7"
+futures = "0.3.21"
 libc = "0.2.119"
 pty-process = { version = "0.2.0", features = ["async"] }
 tokio = { version = "1.17.0", features = ["full"] }
+tokio-util = { version = "0.7.0", features = ["io"] }
 
 [patch.crates-io]
 nix = { git = "https://github.com/nix-rust/nix" }

@@ -1,5 +1,6 @@
+use futures::stream::StreamExt as _;
 use textmode::Textmode as _;
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::io::AsyncWriteExt as _;
 
 #[derive(Debug)]
 enum Command {
@@ -153,7 +154,7 @@ impl State {
         pty.resize(pty_process::Size::new(24, 80)).unwrap();
         let mut cmd = pty_process::Command::new("zsh");
         let mut child = cmd.spawn(&pts).unwrap();
-        let (mut pty_r, pty_w) = pty.into_split();
+        let (pty_r, pty_w) = pty.into_split();
         let vt = vt100::Parser::default();
         let screen = vt.screen().clone();
         let vt = std::sync::Arc::new(tokio::sync::Mutex::new(vt));
@@ -168,19 +169,31 @@ impl State {
         self.current_window = id;
         self.notify(&format!("created window {}", id));
         tokio::task::spawn(async move {
+            enum Res {
+                Bytes(tokio::io::Result<bytes::Bytes>),
+                Done,
+            }
+
             let _pts = pts;
-            let mut buf = [0_u8; 4096];
-            loop {
-                tokio::select! {
-                    bytes = pty_r.read(&mut buf) => match bytes {
+
+            let mut stream: futures::stream::SelectAll<_> = [
+                tokio_util::io::ReaderStream::new(pty_r)
+                    .map(Res::Bytes)
+                    .boxed(),
+                futures::stream::once(child.wait())
+                    .map(|_| Res::Done)
+                    .boxed(),
+            ]
+            .into_iter()
+            .collect();
+            while let Some(res) = stream.next().await {
+                match res {
+                    Res::Bytes(bytes) => match bytes {
                         Ok(bytes) => {
-                            if bytes == 0 {
+                            if bytes.is_empty() {
                                 continue;
                             }
-                            vt.clone()
-                                .lock_owned()
-                                .await
-                                .process(&buf[..bytes]);
+                            vt.clone().lock_owned().await.process(&bytes);
                             notify.send(Event::Output).unwrap();
                         }
                         Err(e) => {
@@ -188,10 +201,10 @@ impl State {
                             break;
                         }
                     },
-                    _ = child.wait() => {
+                    Res::Done => {
                         notify.send(Event::WindowExit(id)).unwrap();
                         break;
-                    },
+                    }
                 }
             }
         });
