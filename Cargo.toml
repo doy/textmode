@@ -33,5 +33,5 @@ pty-process = { version = "0.2.0", features = ["async"] }
 tokio = { version = "1.17.0", features = ["full"] }
 
 [patch.crates-io]
-nix = { path = "../src/nix" }
-pty-process = { path = "../pty-process" }
+nix = { git = "https://github.com/nix-rust/nix" }
+pty-process = { git = "https://github.com/doy/pty-process" }
