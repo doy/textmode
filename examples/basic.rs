@@ -1,10 +1,10 @@
 use textmode::Textmode as _;
 
 #[cfg(feature = "async")]
-async fn run(
-    tm: &mut textmode::Output,
-    input: &mut textmode::Input,
-) -> textmode::Result<()> {
+#[tokio::main]
+async fn main() -> textmode::Result<()> {
+    let mut input = textmode::Input::new().await?;
+    let mut tm = textmode::Output::new().await?;
     tm.move_to(5, 5);
     tm.write_str("foo");
     input.read_key().await?;
@@ -21,16 +21,6 @@ async fn run(
     tm.refresh().await?;
     input.read_key().await?;
     Ok(())
-}
-
-#[cfg(feature = "async")]
-fn main() {
-    smol::block_on(async {
-        let mut input = textmode::Input::new().await.unwrap();
-        let mut tm = textmode::Output::new().await.unwrap();
-        let e = run(&mut tm, &mut input).await;
-        e.unwrap();
-    });
 }
 
 #[cfg(not(feature = "async"))]

@@ -8,11 +8,8 @@
 //! ```no_run
 //! use textmode::Textmode;
 //! # #[cfg(feature = "async")]
+//! # #[tokio::main]
 //! # fn main() -> textmode::Result<()> {
-//! #     futures_lite::future::block_on(async { run().await })
-//! # }
-//! # #[cfg(feature = "async")]
-//! # async fn run() -> textmode::Result<()> {
 //! let mut tm = textmode::Output::new().await?;
 //! tm.clear();
 //! tm.move_to(5, 5);

@@ -6,10 +6,9 @@ edition = "2018"
 
 [dependencies]
 textmode = { path = "../../.." }
-vt100 = "*"
 
-smol = { version = "*", optional = true }
+tokio = { version = "*", features = ["full"], optional = true }
 
 [features]
 default = []
-async = ["textmode/async", "smol"]
+async = ["textmode/async", "tokio"]

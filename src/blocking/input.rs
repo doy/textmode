@@ -36,7 +36,8 @@ impl RawGuard {
     /// Switch back from raw mode early.
     ///
     /// # Errors
-    /// * `Error::SetTerminalMode`: failed to return the terminal from raw mode
+    /// * `Error::SetTerminalMode`: failed to return the terminal from raw
+    /// mode
     pub fn cleanup(&mut self) -> crate::error::Result<()> {
         self.termios.take().map_or(Ok(()), |termios| {
             let stdin = std::io::stdin().as_raw_fd();

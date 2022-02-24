@@ -1,12 +1,13 @@
-use pty_process::Command as _;
-use smol::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use textmode::Textmode as _;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
+#[derive(Debug)]
 enum Command {
     NewWindow,
     NextWindow,
 }
 
+#[derive(Debug)]
 enum Event {
     Input(textmode::Key),
     Output,
@@ -16,8 +17,8 @@ enum Event {
 }
 
 struct Window {
-    child: std::sync::Arc<pty_process::smol::Child>,
-    vt: std::sync::Arc<smol::lock::Mutex<vt100::Parser>>,
+    vt: std::sync::Arc<tokio::sync::Mutex<vt100::Parser>>,
+    pty_w: pty_process::OwnedWritePty,
     screen: vt100::Screen,
 }
 
@@ -33,13 +34,13 @@ struct State {
     next_window_id: usize,
     notifications: std::collections::BTreeMap<usize, Notification>,
     next_notification_id: usize,
-    wevents: smol::channel::Sender<Event>,
-    revents: smol::channel::Receiver<Event>,
+    wevents: tokio::sync::mpsc::UnboundedSender<Event>,
+    revents: tokio::sync::mpsc::UnboundedReceiver<Event>,
 }
 
 impl State {
     fn new() -> Self {
-        let (sender, receiver) = smol::channel::unbounded();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         Self {
             windows: std::collections::BTreeMap::new(),
             current_window: 0,
@@ -59,7 +60,7 @@ impl State {
         self.windows.get_mut(&self.current_window).unwrap()
     }
 
-    fn next_window(&mut self, ex: &smol::Executor<'_>) {
+    fn next_window(&mut self) {
         self.current_window = self
             .windows
             .keys()
@@ -68,13 +69,10 @@ impl State {
             .skip_while(|&id| id < self.current_window)
             .nth(1)
             .unwrap();
-        self.notify(
-            ex,
-            &format!("switched to window {}", self.current_window),
-        );
+        self.notify(&format!("switched to window {}", self.current_window));
     }
 
-    fn notify(&mut self, ex: &smol::Executor<'_>, text: &str) {
+    fn notify(&mut self, text: &str) {
         let now = std::time::Instant::now();
         let expiry = now + std::time::Duration::from_secs(5);
         let text = text.to_string();
@@ -83,43 +81,35 @@ impl State {
         self.next_notification_id += 1;
         self.notifications.insert(id, notification);
         let notify = self.wevents.clone();
-        ex.spawn(async move {
-            smol::Timer::at(expiry).await;
-            notify.send(Event::Notification).await.unwrap();
-        })
-        .detach();
+        tokio::task::spawn(async move {
+            tokio::time::sleep_until(tokio::time::Instant::from_std(expiry))
+                .await;
+            notify.send(Event::Notification).unwrap();
+        });
     }
 
-    fn spawn_input_task(
-        &self,
-        ex: &smol::Executor<'_>,
-        mut input: textmode::Input,
-    ) {
+    fn spawn_input_thread(&self, mut input: textmode::blocking::Input) {
         let notify = self.wevents.clone();
-        ex.spawn(async move {
+        std::thread::spawn(move || {
             let mut waiting_for_command = false;
             input.parse_utf8(false);
             input.parse_meta(false);
             input.parse_special_keys(false);
             loop {
                 input.parse_single(waiting_for_command);
-                match input.read_key().await {
+                match input.read_key() {
                     Ok(Some(key)) => {
                         if waiting_for_command {
                             waiting_for_command = false;
                             match key {
                                 textmode::Key::Ctrl(b'n') => {
-                                    notify
-                                        .send(Event::Input(key))
-                                        .await
-                                        .unwrap();
+                                    notify.send(Event::Input(key)).unwrap();
                                 }
                                 textmode::Key::Byte(b'c') => {
                                     notify
                                         .send(Event::Command(
                                             Command::NewWindow,
                                         ))
-                                        .await
                                         .unwrap();
                                 }
                                 textmode::Key::Byte(b'n') => {
@@ -127,7 +117,6 @@ impl State {
                                         .send(Event::Command(
                                             Command::NextWindow,
                                         ))
-                                        .await
                                         .unwrap();
                                 }
                                 _ => {} // ignore
@@ -138,10 +127,7 @@ impl State {
                                     waiting_for_command = true;
                                 }
                                 _ => {
-                                    notify
-                                        .send(Event::Input(key))
-                                        .await
-                                        .unwrap();
+                                    notify.send(Event::Input(key)).unwrap();
                                 }
                             }
                         }
@@ -155,59 +141,67 @@ impl State {
                     }
                 }
             }
-        })
-        .detach();
+        });
     }
 
     fn new_window(
         &mut self,
-        ex: &smol::Executor<'_>,
-        notify: smol::channel::Sender<Event>,
+        notify: tokio::sync::mpsc::UnboundedSender<Event>,
     ) {
-        let child = smol::process::Command::new("zsh")
-            .spawn_pty(Some(&pty_process::Size::new(24, 80)))
-            .unwrap();
-        let child = std::sync::Arc::new(child);
+        let pty = pty_process::Pty::new().unwrap();
+        let pts = pty.pts().unwrap();
+        pty.resize(pty_process::Size::new(24, 80)).unwrap();
+        let mut cmd = pty_process::Command::new("zsh");
+        let mut child = cmd.spawn(&pts).unwrap();
+        let (mut pty_r, pty_w) = pty.into_split();
         let vt = vt100::Parser::default();
         let screen = vt.screen().clone();
-        let vt = std::sync::Arc::new(smol::lock::Mutex::new(vt));
+        let vt = std::sync::Arc::new(tokio::sync::Mutex::new(vt));
         let id = self.next_window_id;
         self.next_window_id += 1;
         let window = Window {
-            child: child.clone(),
+            pty_w,
             vt: vt.clone(),
             screen,
         };
         self.windows.insert(id, window);
         self.current_window = id;
-        self.notify(ex, &format!("created window {}", id));
-        ex.spawn(async move {
+        self.notify(&format!("created window {}", id));
+        tokio::task::spawn(async move {
+            let _pts = pts;
             let mut buf = [0_u8; 4096];
             loop {
-                match child.pty().read(&mut buf).await {
-                    Ok(bytes) => {
-                        vt.lock_arc().await.process(&buf[..bytes]);
-                        notify.send(Event::Output).await.unwrap();
-                    }
-                    Err(e) => {
-                        // EIO means that the process closed the other
-                        // end of the pty
-                        if e.raw_os_error() != Some(libc::EIO) {
-                            eprintln!("pty read failed: {:?}", e);
+                tokio::select! {
+                    bytes = pty_r.read(&mut buf) => match bytes {
+                        Ok(bytes) => {
+                            if bytes == 0 {
+                                continue;
+                            }
+                            vt.clone()
+                                .lock_owned()
+                                .await
+                                .process(&buf[..bytes]);
+                            notify.send(Event::Output).unwrap();
                         }
-                        notify.send(Event::WindowExit(id)).await.unwrap();
+                        Err(e) => {
+                            eprintln!("pty read failed: {:?}", e);
+                            break;
+                        }
+                    },
+                    _ = child.wait() => {
+                        notify.send(Event::WindowExit(id)).unwrap();
                         break;
-                    }
+                    },
                 }
             }
-        })
-        .detach();
+        });
     }
 
     async fn redraw_current_window(&mut self, tm: &mut textmode::Output) {
         let window = self.current_window();
         tm.clear();
-        let new_screen = window.vt.lock_arc().await.screen().clone();
+        let new_screen =
+            window.vt.clone().lock_owned().await.screen().clone();
         tm.write(&new_screen.state_formatted());
         self.draw_notifications(tm, &new_screen);
         tm.refresh().await.unwrap();
@@ -216,7 +210,8 @@ impl State {
     async fn update_current_window(&mut self, tm: &mut textmode::Output) {
         let window = self.current_window();
         let old_screen = window.screen.clone();
-        let new_screen = window.vt.lock_arc().await.screen().clone();
+        let new_screen =
+            window.vt.clone().lock_owned().await.screen().clone();
         let diff = new_screen.state_diff(&old_screen);
         self.clear_notifications(tm, &old_screen);
         tm.write(&diff);
@@ -292,88 +287,75 @@ impl State {
 
 #[must_use]
 pub struct Tmux {
-    input: textmode::Input,
+    input: textmode::blocking::Input,
     tm: textmode::Output,
     state: State,
 }
 
 impl Tmux {
     pub async fn new() -> Self {
-        let input = textmode::Input::new().await.unwrap();
+        let input = textmode::blocking::Input::new().unwrap();
         let tm = textmode::Output::new().await.unwrap();
         let state = State::new();
         Self { input, tm, state }
     }
 
-    pub async fn run(self, ex: &smol::Executor<'_>) {
+    pub async fn run(self) {
         let Self {
-            input,
+            mut input,
             mut tm,
             mut state,
         } = self;
 
-        state.spawn_input_task(ex, input);
+        let _raw_guard = input.take_raw_guard();
+        state.spawn_input_thread(input);
 
-        ex.run(async {
-            state.new_window(ex, state.wevents.clone());
+        state.new_window(state.wevents.clone());
 
-            loop {
-                match state.revents.recv().await {
-                    Ok(Event::Output) => {
-                        state.update_current_window(&mut tm).await;
+        loop {
+            match state.revents.recv().await {
+                Some(Event::Output) => {
+                    state.update_current_window(&mut tm).await;
+                }
+                Some(Event::Input(key)) => {
+                    state
+                        .current_window_mut()
+                        .pty_w
+                        .write_all(&key.into_bytes())
+                        .await
+                        .unwrap();
+                }
+                Some(Event::WindowExit(id)) => {
+                    // do this first because next_window breaks if
+                    // current_window is greater than all existing windows
+                    if state.current_window == id {
+                        state.next_window()
                     }
-                    Ok(Event::Input(key)) => {
-                        state
-                            .current_window()
-                            .child
-                            .pty()
-                            .write_all(&key.into_bytes())
-                            .await
-                            .unwrap();
-                    }
-                    Ok(Event::WindowExit(id)) => {
-                        // do this first because next_window breaks if
-                        // current_window is greater than all existing windows
-                        if state.current_window == id {
-                            state.next_window(ex)
-                        }
-                        let mut dropped_window =
-                            state.windows.remove(&id).unwrap();
-                        // i can get_mut because at this point the future
-                        // holding the other copy of child has already been
-                        // dropped
-                        std::sync::Arc::get_mut(&mut dropped_window.child)
-                            .unwrap()
-                            .status()
-                            .await
-                            .unwrap();
-                        if state.windows.is_empty() {
-                            break;
-                        }
-                        state.notify(ex, &format!("window {} exited", id));
-
-                        state.redraw_current_window(&mut tm).await;
-                    }
-                    Ok(Event::Command(c)) => match c {
-                        Command::NewWindow => {
-                            state.new_window(ex, state.wevents.clone());
-                            state.redraw_current_window(&mut tm).await;
-                        }
-                        Command::NextWindow => {
-                            state.next_window(ex);
-                            state.redraw_current_window(&mut tm).await;
-                        }
-                    },
-                    Ok(Event::Notification) => {
-                        state.update_current_window(&mut tm).await;
-                    }
-                    Err(e) => {
-                        eprintln!("{}", e);
+                    state.windows.remove(&id).unwrap();
+                    if state.windows.is_empty() {
                         break;
                     }
+                    state.notify(&format!("window {} exited", id));
+
+                    state.redraw_current_window(&mut tm).await;
+                }
+                Some(Event::Command(c)) => match c {
+                    Command::NewWindow => {
+                        state.new_window(state.wevents.clone());
+                        state.redraw_current_window(&mut tm).await;
+                    }
+                    Command::NextWindow => {
+                        state.next_window();
+                        state.redraw_current_window(&mut tm).await;
+                    }
+                },
+                Some(Event::Notification) => {
+                    state.update_current_window(&mut tm).await;
+                }
+                None => {
+                    break;
                 }
             }
-        })
-        .await;
+        }
     }
 }

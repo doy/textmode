@@ -1,5 +1,5 @@
-use futures_lite::io::AsyncReadExt as _;
 use std::os::unix::io::AsRawFd as _;
+use tokio::io::AsyncReadExt as _;
 
 use crate::private::Input as _;
 
@@ -16,16 +16,20 @@ impl RawGuard {
     ///
     /// # Errors
     /// * `Error::SetTerminalMode`: failed to put the terminal into raw mode
+    // spawn_blocking is uncancellable, and the tcgetattr/tcsetattr calls
+    // can't panic, so unwrap is safe here
+    #[allow(clippy::missing_panics_doc)]
     pub async fn new() -> crate::error::Result<Self> {
         let stdin = std::io::stdin().as_raw_fd();
-        let termios = blocking::unblock(move || {
+        let termios = tokio::task::spawn_blocking(move || {
             nix::sys::termios::tcgetattr(stdin)
                 .map_err(crate::error::Error::SetTerminalMode)
         })
-        .await?;
+        .await
+        .unwrap()?;
         let mut termios_raw = termios.clone();
         nix::sys::termios::cfmakeraw(&mut termios_raw);
-        blocking::unblock(move || {
+        tokio::task::spawn_blocking(move || {
             nix::sys::termios::tcsetattr(
                 stdin,
                 nix::sys::termios::SetArg::TCSANOW,
@@ -33,7 +37,8 @@ impl RawGuard {
             )
             .map_err(crate::error::Error::SetTerminalMode)
         })
-        .await?;
+        .await
+        .unwrap()?;
         Ok(Self {
             termios: Some(termios),
         })
@@ -42,11 +47,15 @@ impl RawGuard {
     /// Switch back from raw mode early.
     ///
     /// # Errors
-    /// * `Error::SetTerminalMode`: failed to return the terminal from raw mode
+    /// * `Error::SetTerminalMode`: failed to return the terminal from raw
+    /// mode
+    // spawn_blocking is uncancellable, and the tcsetattr call can't panic, so
+    // unwrap is safe here
+    #[allow(clippy::missing_panics_doc)]
     pub async fn cleanup(&mut self) -> crate::error::Result<()> {
         if let Some(termios) = self.termios.take() {
             let stdin = std::io::stdin().as_raw_fd();
-            blocking::unblock(move || {
+            tokio::task::spawn_blocking(move || {
                 nix::sys::termios::tcsetattr(
                     stdin,
                     nix::sys::termios::SetArg::TCSANOW,
@@ -55,6 +64,7 @@ impl RawGuard {
                 .map_err(crate::error::Error::SetTerminalMode)
             })
             .await
+            .unwrap()
         } else {
             Ok(())
         }
@@ -66,11 +76,19 @@ impl Drop for RawGuard {
     /// of an async drop mechanism. If this could be a problem, you should
     /// call `cleanup` manually instead.
     fn drop(&mut self) {
-        futures_lite::future::block_on(async {
-            // https://github.com/rust-lang/rust-clippy/issues/8003
-            #[allow(clippy::let_underscore_drop)]
-            let _ = self.cleanup().await;
-        });
+        // doesn't literally call `cleanup`, because calling spawn_blocking
+        // while the tokio runtime is in the process of shutting down doesn't
+        // work (spawn_blocking tasks are cancelled if the runtime starts
+        // shutting down before the task body starts running), but should be
+        // kept in sync with the actual things that `cleanup` does.
+        if let Some(termios) = self.termios.take() {
+            let stdin = std::io::stdin().as_raw_fd();
+            let _ = nix::sys::termios::tcsetattr(
+                stdin,
+                nix::sys::termios::SetArg::TCSANOW,
+                &termios,
+            );
+        }
     }
 }
 
@@ -80,8 +98,16 @@ impl Drop for RawGuard {
 /// additionally configure the types of keypresses you are interested in
 /// through the `parse_*` methods. This configuration can be changed between
 /// any two calls to [`read_key`](Input::read_key).
+///
+/// # Note
+///
+/// This is built on [`tokio::io::Stdin`], and inherits its caveats. In
+/// particular, it will likely cause a hang until one more newline is received
+/// when the tokio runtime shuts down. Because of this, it is generally
+/// recommended to spawn a thread and use
+/// [`textmode::blocking::Input`](crate::blocking::Input) instead.
 pub struct Input {
-    stdin: blocking::Unblock<std::io::Stdin>,
+    stdin: tokio::io::Stdin,
     raw: Option<RawGuard>,
 
     buf: Vec<u8>,
@@ -161,7 +187,7 @@ impl Input {
     #[must_use]
     pub fn new_without_raw() -> Self {
         Self {
-            stdin: blocking::Unblock::new(std::io::stdin()),
+            stdin: tokio::io::stdin(),
             raw: None,
             buf: Vec::with_capacity(4096),
             pos: 0,
@@ -290,7 +316,7 @@ impl Input {
 }
 
 async fn read_stdin(
-    stdin: &mut blocking::Unblock<std::io::Stdin>,
+    stdin: &mut tokio::io::Stdin,
     buf: &mut [u8],
 ) -> crate::error::Result<usize> {
     stdin

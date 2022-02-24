@@ -312,25 +312,29 @@ fn run_input_test(
 }
 
 #[track_caller]
-fn write(f: &mut std::fs::File, key: textmode::Key) {
+fn write(f: &mut pty_process::blocking::Pty, key: textmode::Key) {
     f.write_all(&key.into_bytes()).unwrap();
 }
 
 #[track_caller]
-fn read(f: &mut std::io::BufReader<&mut std::fs::File>) -> String {
+fn read(
+    f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
+) -> String {
     std::string::String::from_utf8(fixtures::read_line(f)).unwrap()
 }
 
 #[track_caller]
 fn assert_line(
-    f: &mut std::io::BufReader<&mut std::fs::File>,
+    f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
     expected: &str,
 ) {
     assert_eq!(read(f), format!("{}\r\n", expected));
 }
 
 #[track_caller]
-fn assert_no_more_lines(f: &mut std::io::BufReader<&mut std::fs::File>) {
+fn assert_no_more_lines(
+    f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
+) {
     if fixtures::read_ready(f.get_ref().as_raw_fd()) || !f.buffer().is_empty()
     {
         use std::io::Read as _;

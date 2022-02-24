@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+* migrated to tokio
+
 ## [0.3.0] - 2021-12-15
 
 ### Added

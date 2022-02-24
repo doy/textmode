@@ -2,15 +2,10 @@
 mod tmux_impl;
 
 #[cfg(feature = "async")]
-async fn async_main(ex: &smol::Executor<'_>) {
+#[tokio::main]
+async fn main() {
     let tmux = tmux_impl::Tmux::new().await;
-    tmux.run(ex).await;
-}
-
-#[cfg(feature = "async")]
-fn main() {
-    let ex = smol::Executor::new();
-    smol::block_on(async { async_main(&ex).await })
+    tmux.run().await;
 }
 
 #[cfg(not(feature = "async"))]

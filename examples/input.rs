@@ -1,5 +1,6 @@
 #[cfg(feature = "async")]
-async fn async_main() {
+#[tokio::main]
+async fn main() {
     let mut input = textmode::Input::new().await.unwrap();
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
@@ -25,11 +26,6 @@ async fn async_main() {
             break;
         }
     }
-}
-
-#[cfg(feature = "async")]
-fn main() {
-    smol::block_on(async { async_main().await })
 }
 
 #[cfg(not(feature = "async"))]

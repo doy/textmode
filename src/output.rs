@@ -1,4 +1,4 @@
-use futures_lite::io::AsyncWriteExt as _;
+use tokio::io::AsyncWriteExt as _;
 
 use crate::private::Output as _;
 
@@ -16,11 +16,7 @@ impl ScreenGuard {
     /// # Errors
     /// * `Error::WriteStdout`: failed to write initialization to stdout
     pub async fn new() -> crate::error::Result<Self> {
-        write_stdout(
-            &mut blocking::Unblock::new(std::io::stdout()),
-            crate::INIT,
-        )
-        .await?;
+        write_stdout(&mut tokio::io::stdout(), crate::INIT).await?;
         Ok(Self { cleaned_up: false })
     }
 
@@ -33,11 +29,7 @@ impl ScreenGuard {
             return Ok(());
         }
         self.cleaned_up = true;
-        write_stdout(
-            &mut blocking::Unblock::new(std::io::stdout()),
-            crate::DEINIT,
-        )
-        .await
+        write_stdout(&mut tokio::io::stdout(), crate::DEINIT).await
     }
 }
 
@@ -46,10 +38,12 @@ impl Drop for ScreenGuard {
     /// of an async drop mechanism. If this could be a problem, you should
     /// call `cleanup` manually instead.
     fn drop(&mut self) {
-        futures_lite::future::block_on(async {
-            // https://github.com/rust-lang/rust-clippy/issues/8003
-            #[allow(clippy::let_underscore_drop)]
-            let _ = self.cleanup().await;
+        tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current().block_on(async {
+                // https://github.com/rust-lang/rust-clippy/issues/8003
+                #[allow(clippy::let_underscore_drop)]
+                let _ = self.cleanup().await;
+            });
         });
     }
 }
@@ -61,7 +55,7 @@ impl Drop for ScreenGuard {
 /// then call [`refresh`](Output::refresh) when you want to update the
 /// terminal on `stdout`.
 pub struct Output {
-    stdout: blocking::Unblock<std::io::Stdout>,
+    stdout: tokio::io::Stdout,
     screen: Option<ScreenGuard>,
 
     cur: vt100::Parser,
@@ -112,8 +106,9 @@ impl Output {
         };
         let cur = vt100::Parser::new(rows, cols, 0);
         let next = vt100::Parser::new(rows, cols, 0);
+
         Self {
-            stdout: blocking::Unblock::new(std::io::stdout()),
+            stdout: tokio::io::stdout(),
             screen: None,
             cur,
             next,
@@ -158,7 +153,7 @@ impl Output {
 }
 
 async fn write_stdout(
-    stdout: &mut blocking::Unblock<std::io::Stdout>,
+    stdout: &mut tokio::io::Stdout,
     buf: &[u8],
 ) -> crate::error::Result<()> {
     stdout

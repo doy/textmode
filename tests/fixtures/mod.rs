@@ -1,4 +1,3 @@
-use pty_process::Command as _;
 use std::io::{BufRead as _, Read as _};
 use std::os::unix::io::AsRawFd as _;
 
@@ -62,33 +61,34 @@ pub struct BuiltFixture {
 }
 
 impl BuiltFixture {
-    pub fn run<F: FnOnce(&mut std::fs::File)>(
+    pub fn run<F: FnOnce(&mut pty_process::blocking::Pty)>(
         &mut self,
         args: &[&str],
         f: F,
     ) {
-        let mut cmd = self.run.command();
-        let mut child = cmd
-            .args(args)
-            .spawn_pty(Some(&pty_process::Size::new(24, 80)))
-            .unwrap();
+        let mut pty = pty_process::blocking::Pty::new().unwrap();
+        let pts = pty.pts().unwrap();
+        pty.resize(pty_process::Size::new(24, 80)).unwrap();
+        let mut cmd = pty_process::blocking::Command::new(self.run.path());
+        cmd.args(args);
+        let mut child = cmd.spawn(&pts).unwrap();
 
         if self.screenguard {
-            assert!(read_ready(child.pty().as_raw_fd()));
+            assert!(read_ready(pty.as_raw_fd()));
             let mut buf = vec![0u8; 1024];
-            let bytes = child.pty().read(&mut buf).unwrap();
+            let bytes = pty.read(&mut buf).unwrap();
             buf.truncate(bytes);
             assert_eq!(&buf[..], b"\x1b7\x1b[?47h\x1b[2J\x1b[H\x1b[?25h");
         } else {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        f(child.pty_mut());
+        f(&mut pty);
 
         if self.screenguard {
-            assert!(read_ready(child.pty().as_raw_fd()));
+            assert!(read_ready(pty.as_raw_fd()));
             let mut buf = vec![0u8; 1024];
-            let bytes = child.pty().read(&mut buf).unwrap();
+            let bytes = pty.read(&mut buf).unwrap();
             buf.truncate(bytes);
             assert_eq!(&buf[..], b"\x1b[?47l\x1b8\x1b[?25h");
         }
@@ -100,7 +100,7 @@ impl BuiltFixture {
 
 #[allow(dead_code)]
 #[track_caller]
-pub fn read(f: &mut std::fs::File) -> Vec<u8> {
+pub fn read(f: &mut pty_process::blocking::Pty) -> Vec<u8> {
     assert!(read_ready(f.as_raw_fd()));
     let mut buf = vec![0u8; 1024];
     let bytes = f.read(&mut buf).unwrap();
@@ -110,7 +110,9 @@ pub fn read(f: &mut std::fs::File) -> Vec<u8> {
 
 #[allow(dead_code)]
 #[track_caller]
-pub fn read_line(f: &mut std::io::BufReader<&mut std::fs::File>) -> Vec<u8> {
+pub fn read_line(
+    f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
+) -> Vec<u8> {
     assert!(!f.buffer().is_empty() || read_ready(f.get_ref().as_raw_fd()));
     let mut buf = vec![];
     f.read_until(b'\n', &mut buf).unwrap();
