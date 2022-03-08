@@ -38,13 +38,22 @@ impl Drop for ScreenGuard {
     /// of an async drop mechanism. If this could be a problem, you should
     /// call `cleanup` manually instead.
     fn drop(&mut self) {
-        tokio::task::block_in_place(move || {
-            tokio::runtime::Handle::current().block_on(async {
-                // https://github.com/rust-lang/rust-clippy/issues/8003
-                #[allow(clippy::let_underscore_drop)]
-                let _ = self.cleanup().await;
-            });
-        });
+        // doesn't literally call `cleanup`, because calling spawn_blocking
+        // while the tokio runtime is in the process of shutting down doesn't
+        // work (spawn_blocking tasks are cancelled if the runtime starts
+        // shutting down before the task body starts running), and using
+        // block_in_place/block_on doesn't work on the current_thread runtime,
+        // but should be kept in sync with the actual things that `cleanup`
+        // does.
+        use std::io::Write as _;
+
+        if !self.cleaned_up {
+            let mut stdout = std::io::stdout();
+            #[allow(clippy::let_underscore_drop)]
+            let _ = stdout.write_all(crate::DEINIT);
+            #[allow(clippy::let_underscore_drop)]
+            let _ = stdout.flush();
+        }
     }
 }
 

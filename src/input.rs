@@ -79,8 +79,10 @@ impl Drop for RawGuard {
         // doesn't literally call `cleanup`, because calling spawn_blocking
         // while the tokio runtime is in the process of shutting down doesn't
         // work (spawn_blocking tasks are cancelled if the runtime starts
-        // shutting down before the task body starts running), but should be
-        // kept in sync with the actual things that `cleanup` does.
+        // shutting down before the task body starts running), and using
+        // block_in_place/block_on doesn't work on the current_thread runtime,
+        // but should be kept in sync with the actual things that `cleanup`
+        // does.
         if let Some(termios) = self.termios.take() {
             let stdin = std::io::stdin().as_raw_fd();
             let _ = nix::sys::termios::tcsetattr(
