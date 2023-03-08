@@ -74,7 +74,7 @@ impl BuiltFixture {
         let mut child = cmd.spawn(&pts).unwrap();
 
         if self.screenguard {
-            assert!(read_ready(pty.as_raw_fd()));
+            assert!(read_ready(&pty));
             let mut buf = vec![0u8; 1024];
             let bytes = pty.read(&mut buf).unwrap();
             buf.truncate(bytes);
@@ -86,7 +86,7 @@ impl BuiltFixture {
         f(&mut pty);
 
         if self.screenguard {
-            assert!(read_ready(pty.as_raw_fd()));
+            assert!(read_ready(&pty));
             let mut buf = vec![0u8; 1024];
             let bytes = pty.read(&mut buf).unwrap();
             buf.truncate(bytes);
@@ -101,7 +101,7 @@ impl BuiltFixture {
 #[allow(dead_code)]
 #[track_caller]
 pub fn read(f: &mut pty_process::blocking::Pty) -> Vec<u8> {
-    assert!(read_ready(f.as_raw_fd()));
+    assert!(read_ready(&f));
     let mut buf = vec![0u8; 1024];
     let bytes = f.read(&mut buf).unwrap();
     buf.truncate(bytes);
@@ -113,16 +113,17 @@ pub fn read(f: &mut pty_process::blocking::Pty) -> Vec<u8> {
 pub fn read_line(
     f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
 ) -> Vec<u8> {
-    assert!(!f.buffer().is_empty() || read_ready(f.get_ref().as_raw_fd()));
+    assert!(!f.buffer().is_empty() || read_ready(f.get_ref()));
     let mut buf = vec![];
     f.read_until(b'\n', &mut buf).unwrap();
     buf
 }
 
 #[allow(dead_code)]
-pub fn read_ready(fd: std::os::unix::io::RawFd) -> bool {
+pub fn read_ready<Fd: std::os::fd::AsFd>(fd: Fd) -> bool {
     let mut set = nix::sys::select::FdSet::new();
-    set.insert(fd);
+    let raw_fd = fd.as_fd().as_raw_fd();
+    set.insert(raw_fd);
     let timeout = libc::timeval {
         tv_sec: 0,
         tv_usec: 100_000,
@@ -137,7 +138,7 @@ pub fn read_ready(fd: std::os::unix::io::RawFd) -> bool {
     ) {
         Ok(n) => {
             if n > 0 {
-                set.contains(fd)
+                set.contains(raw_fd)
             } else {
                 false
             }

@@ -1,5 +1,4 @@
 use std::io::Write as _;
-use std::os::unix::io::AsRawFd as _;
 
 mod fixtures;
 
@@ -11,7 +10,7 @@ fn test_basic() {
         assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
 
         pty.write_all(b"a").unwrap();
-        assert!(!fixtures::read_ready(pty.as_raw_fd()));
+        assert!(!fixtures::read_ready(&pty));
 
         pty.write_all(b"a").unwrap();
         assert_eq!(
@@ -32,7 +31,7 @@ fn test_async() {
         assert_eq!(fixtures::read(pty), b"\x1b[6;6Hfoo");
 
         pty.write_all(b"a").unwrap();
-        assert!(!fixtures::read_ready(pty.as_raw_fd()));
+        assert!(!fixtures::read_ready(&pty));
 
         pty.write_all(b"a").unwrap();
         assert_eq!(

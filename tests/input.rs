@@ -1,7 +1,6 @@
 #![allow(clippy::collapsible_if)]
 
 use std::io::Write as _;
-use std::os::unix::io::AsRawFd as _;
 
 mod fixtures;
 
@@ -335,8 +334,7 @@ fn assert_line(
 fn assert_no_more_lines(
     f: &mut std::io::BufReader<&mut pty_process::blocking::Pty>,
 ) {
-    if fixtures::read_ready(f.get_ref().as_raw_fd()) || !f.buffer().is_empty()
-    {
+    if fixtures::read_ready(f.get_ref()) || !f.buffer().is_empty() {
         use std::io::Read as _;
         let mut buf = vec![0; 4096];
         let bytes = f.read(&mut buf).unwrap();
