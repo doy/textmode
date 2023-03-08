@@ -36,8 +36,6 @@ impl ScreenGuard {
 impl Drop for ScreenGuard {
     /// Calls `cleanup`.
     fn drop(&mut self) {
-        // https://github.com/rust-lang/rust-clippy/issues/8003
-        #[allow(clippy::let_underscore_drop)]
         let _ = self.cleanup();
     }
 }

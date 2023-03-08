@@ -318,7 +318,7 @@ pub trait Input {
     }
 
     fn getc(&mut self) -> Option<u8> {
-        self.buf().get(0).copied().map(|c| {
+        self.buf().first().copied().map(|c| {
             self.consume(1);
             c
         })

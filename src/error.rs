@@ -15,13 +15,13 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ReadStdin(e) => {
-                write!(f, "error reading from stdin: {}", e)
+                write!(f, "error reading from stdin: {e}")
             }
             Self::SetTerminalMode(e) => {
-                write!(f, "error setting terminal mode: {}", e)
+                write!(f, "error setting terminal mode: {e}")
             }
             Self::WriteStdout(e) => {
-                write!(f, "error writing to stdout: {}", e)
+                write!(f, "error writing to stdout: {e}")
             }
         }
     }

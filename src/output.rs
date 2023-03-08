@@ -49,9 +49,7 @@ impl Drop for ScreenGuard {
 
         if !self.cleaned_up {
             let mut stdout = std::io::stdout();
-            #[allow(clippy::let_underscore_drop)]
             let _ = stdout.write_all(crate::DEINIT);
-            #[allow(clippy::let_underscore_drop)]
             let _ = stdout.flush();
         }
     }
