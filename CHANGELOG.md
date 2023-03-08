@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2023-03-08
+
+### Fixed
+
+* fixed textmode::blocking::Output::hard_refresh accidentally being async
 
 ### Changed
 
