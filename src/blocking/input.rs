@@ -1,5 +1,4 @@
 use std::io::Read as _;
-use std::os::unix::io::AsRawFd as _;
 
 use crate::private::Input as _;
 
@@ -17,8 +16,8 @@ impl RawGuard {
     /// # Errors
     /// * `Error::SetTerminalMode`: failed to put the terminal into raw mode
     pub fn new() -> crate::error::Result<Self> {
-        let stdin = std::io::stdin().as_raw_fd();
-        let termios = nix::sys::termios::tcgetattr(stdin)
+        let stdin = std::io::stdin();
+        let termios = nix::sys::termios::tcgetattr(&stdin)
             .map_err(crate::error::Error::SetTerminalMode)?;
         let mut termios_raw = termios.clone();
         nix::sys::termios::cfmakeraw(&mut termios_raw);
@@ -40,7 +39,7 @@ impl RawGuard {
     /// mode
     pub fn cleanup(&mut self) -> crate::error::Result<()> {
         self.termios.take().map_or(Ok(()), |termios| {
-            let stdin = std::io::stdin().as_raw_fd();
+            let stdin = std::io::stdin();
             nix::sys::termios::tcsetattr(
                 stdin,
                 nix::sys::termios::SetArg::TCSANOW,

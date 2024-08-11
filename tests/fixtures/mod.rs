@@ -1,5 +1,4 @@
 use std::io::{BufRead as _, Read as _};
-use std::os::unix::io::AsRawFd as _;
 
 pub struct Fixture {
     name: String,
@@ -122,7 +121,7 @@ pub fn read_line(
 #[allow(dead_code)]
 pub fn read_ready<Fd: std::os::fd::AsFd>(fd: Fd) -> bool {
     let mut set = nix::sys::select::FdSet::new();
-    let raw_fd = fd.as_fd().as_raw_fd();
+    let raw_fd = fd.as_fd();
     set.insert(raw_fd);
     let timeout = libc::timeval {
         tv_sec: 0,

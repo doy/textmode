@@ -14,8 +14,8 @@ include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
 
 [dependencies]
 itoa = "1.0.6"
-nix = "0.26.2"
-terminal_size = "0.2.5"
+nix = { version = "0.29", features = ["poll", "term"] }
+terminal_size = "0.3.0"
 vt100 = "0.15.2"
 
 tokio = { version = "1.26.0", features = ["io-std", "io-util", "rt", "rt-multi-thread"], optional = true }
@@ -31,6 +31,6 @@ bytes = "1.4.0"
 escargot = "0.5.7"
 futures = "0.3.26"
 libc = "0.2.139"
-pty-process = { version = "0.3.0", features = ["async"] }
+pty-process = { version = "0.4.0", features = ["async"] }
 tokio = { version = "1.26.0", features = ["full"] }
 tokio-util = { version = "0.7.7", features = ["io"] }
