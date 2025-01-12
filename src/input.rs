@@ -1,4 +1,3 @@
-use std::os::unix::io::AsRawFd as _;
 use tokio::io::AsyncReadExt as _;
 
 use crate::private::Input as _;
@@ -20,9 +19,8 @@ impl RawGuard {
     // can't panic, so unwrap is safe here
     #[allow(clippy::missing_panics_doc)]
     pub async fn new() -> crate::error::Result<Self> {
-        let stdin = std::io::stdin().as_raw_fd();
         let termios = tokio::task::spawn_blocking(move || {
-            nix::sys::termios::tcgetattr(stdin)
+            nix::sys::termios::tcgetattr(std::io::stdin())
                 .map_err(crate::error::Error::SetTerminalMode)
         })
         .await
@@ -31,7 +29,7 @@ impl RawGuard {
         nix::sys::termios::cfmakeraw(&mut termios_raw);
         tokio::task::spawn_blocking(move || {
             nix::sys::termios::tcsetattr(
-                stdin,
+                std::io::stdin(),
                 nix::sys::termios::SetArg::TCSANOW,
                 &termios_raw,
             )
@@ -54,10 +52,9 @@ impl RawGuard {
     #[allow(clippy::missing_panics_doc)]
     pub async fn cleanup(&mut self) -> crate::error::Result<()> {
         if let Some(termios) = self.termios.take() {
-            let stdin = std::io::stdin().as_raw_fd();
             tokio::task::spawn_blocking(move || {
                 nix::sys::termios::tcsetattr(
-                    stdin,
+                    std::io::stdin(),
                     nix::sys::termios::SetArg::TCSANOW,
                     &termios,
                 )
@@ -84,9 +81,8 @@ impl Drop for RawGuard {
         // but should be kept in sync with the actual things that `cleanup`
         // does.
         if let Some(termios) = self.termios.take() {
-            let stdin = std::io::stdin().as_raw_fd();
             let _ = nix::sys::termios::tcsetattr(
-                stdin,
+                std::io::stdin(),
                 nix::sys::termios::SetArg::TCSANOW,
                 &termios,
             );
