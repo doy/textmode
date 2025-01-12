@@ -46,7 +46,7 @@ impl RawGuard {
     ///
     /// # Errors
     /// * `Error::SetTerminalMode`: failed to return the terminal from raw
-    /// mode
+    ///   mode
     // spawn_blocking is uncancellable, and the tcsetattr call can't panic, so
     // unwrap is safe here
     #[allow(clippy::missing_panics_doc)]
