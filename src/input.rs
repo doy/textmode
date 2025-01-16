@@ -162,10 +162,6 @@ impl crate::private::Input for Input {
     fn should_parse_special_keys(&self) -> bool {
         self.parse_special_keys
     }
-
-    fn should_parse_single(&self) -> bool {
-        self.parse_single
-    }
 }
 
 impl Input {

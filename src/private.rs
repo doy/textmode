@@ -28,7 +28,6 @@ pub trait Input {
     fn should_parse_ctrl(&self) -> bool;
     fn should_parse_meta(&self) -> bool;
     fn should_parse_special_keys(&self) -> bool;
-    fn should_parse_single(&self) -> bool;
 
     fn try_read_string(&mut self) -> Option<crate::Key> {
         if !self.should_parse_utf8() {
