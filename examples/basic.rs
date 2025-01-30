@@ -25,8 +25,8 @@ async fn main() -> textmode::Result<()> {
 
 #[cfg(not(feature = "async"))]
 fn main() {
-    let mut tm = textmode::blocking::Output::new().unwrap();
     let mut input = textmode::blocking::Input::new().unwrap();
+    let mut tm = textmode::blocking::Output::new().unwrap();
 
     tm.move_to(5, 5);
     tm.write_str("foo");
