@@ -338,11 +338,13 @@ fn assert_no_more_lines(
         use std::io::Read as _;
         let mut buf = vec![0; 4096];
         let bytes = f.read(&mut buf).unwrap();
-        buf.truncate(bytes);
-        panic!(
-            "got bytes: \"{}\"({:?})",
-            std::string::String::from_utf8_lossy(&buf),
-            buf
-        );
+        if bytes > 0 {
+            buf.truncate(bytes);
+            panic!(
+                "got bytes: \"{}\"({:?})",
+                std::string::String::from_utf8_lossy(&buf),
+                buf
+            );
+        }
     }
 }
