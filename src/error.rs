@@ -5,7 +5,7 @@ pub enum Error {
     ReadStdin(std::io::Error),
 
     /// error setting terminal mode
-    SetTerminalMode(nix::Error),
+    SetTerminalMode(rustix::io::Errno),
 
     /// error writing to stdout
     WriteStdout(std::io::Error),

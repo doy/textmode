@@ -5,7 +5,7 @@ use crate::private::Input as _;
 /// Switches the terminal on `stdin` to raw mode, and restores it when this
 /// object goes out of scope.
 pub struct RawGuard {
-    termios: Option<nix::sys::termios::Termios>,
+    termios: Option<rustix::termios::Termios>,
 }
 
 impl RawGuard {
@@ -20,17 +20,17 @@ impl RawGuard {
     #[allow(clippy::missing_panics_doc)]
     pub async fn new() -> crate::error::Result<Self> {
         let termios = tokio::task::spawn_blocking(move || {
-            nix::sys::termios::tcgetattr(std::io::stdin())
+            rustix::termios::tcgetattr(std::io::stdin())
                 .map_err(crate::error::Error::SetTerminalMode)
         })
         .await
         .unwrap()?;
         let mut termios_raw = termios.clone();
-        nix::sys::termios::cfmakeraw(&mut termios_raw);
+        termios_raw.make_raw();
         tokio::task::spawn_blocking(move || {
-            nix::sys::termios::tcsetattr(
+            rustix::termios::tcsetattr(
                 std::io::stdin(),
-                nix::sys::termios::SetArg::TCSANOW,
+                rustix::termios::OptionalActions::Now,
                 &termios_raw,
             )
             .map_err(crate::error::Error::SetTerminalMode)
@@ -53,9 +53,9 @@ impl RawGuard {
     pub async fn cleanup(&mut self) -> crate::error::Result<()> {
         if let Some(termios) = self.termios.take() {
             tokio::task::spawn_blocking(move || {
-                nix::sys::termios::tcsetattr(
+                rustix::termios::tcsetattr(
                     std::io::stdin(),
-                    nix::sys::termios::SetArg::TCSANOW,
+                    rustix::termios::OptionalActions::Now,
                     &termios,
                 )
                 .map_err(crate::error::Error::SetTerminalMode)
@@ -81,9 +81,9 @@ impl Drop for RawGuard {
         // but should be kept in sync with the actual things that `cleanup`
         // does.
         if let Some(termios) = self.termios.take() {
-            let _ = nix::sys::termios::tcsetattr(
+            let _ = rustix::termios::tcsetattr(
                 std::io::stdin(),
-                nix::sys::termios::SetArg::TCSANOW,
+                rustix::termios::OptionalActions::Now,
                 &termios,
             );
         }

@@ -5,7 +5,7 @@ use crate::private::Input as _;
 /// Switches the terminal on `stdin` to raw mode, and restores it when this
 /// object goes out of scope.
 pub struct RawGuard {
-    termios: Option<nix::sys::termios::Termios>,
+    termios: Option<rustix::termios::Termios>,
 }
 
 impl RawGuard {
@@ -17,13 +17,13 @@ impl RawGuard {
     /// * `Error::SetTerminalMode`: failed to put the terminal into raw mode
     pub fn new() -> crate::error::Result<Self> {
         let stdin = std::io::stdin();
-        let termios = nix::sys::termios::tcgetattr(&stdin)
+        let termios = rustix::termios::tcgetattr(&stdin)
             .map_err(crate::error::Error::SetTerminalMode)?;
         let mut termios_raw = termios.clone();
-        nix::sys::termios::cfmakeraw(&mut termios_raw);
-        nix::sys::termios::tcsetattr(
+        termios_raw.make_raw();
+        rustix::termios::tcsetattr(
             &stdin,
-            nix::sys::termios::SetArg::TCSANOW,
+            rustix::termios::OptionalActions::Now,
             &termios_raw,
         )
         .map_err(crate::error::Error::SetTerminalMode)?;
@@ -40,9 +40,9 @@ impl RawGuard {
     pub fn cleanup(&mut self) -> crate::error::Result<()> {
         self.termios.take().map_or(Ok(()), |termios| {
             let stdin = std::io::stdin();
-            nix::sys::termios::tcsetattr(
+            rustix::termios::tcsetattr(
                 &stdin,
-                nix::sys::termios::SetArg::TCSANOW,
+                rustix::termios::OptionalActions::Now,
                 &termios,
             )
             .map_err(crate::error::Error::SetTerminalMode)
