@@ -1,3 +1,5 @@
+use std::os::fd::AsFd as _;
+
 use futures::stream::StreamExt as _;
 use textmode::Textmode as _;
 use tokio::io::AsyncWriteExt as _;
@@ -149,11 +151,11 @@ impl State {
         &mut self,
         notify: tokio::sync::mpsc::UnboundedSender<Event>,
     ) {
-        let pty = pty_process::Pty::new().unwrap();
-        let pts = pty.pts().unwrap();
+        let (pty, pts) = pty_process::open().unwrap();
+        let pts_clone = pts.as_fd().try_clone_to_owned().unwrap();
         pty.resize(pty_process::Size::new(24, 80)).unwrap();
-        let mut cmd = pty_process::Command::new("zsh");
-        let mut child = cmd.spawn(&pts).unwrap();
+        let cmd = pty_process::Command::new("zsh");
+        let mut child = cmd.spawn(pts).unwrap();
         let (pty_r, pty_w) = pty.into_split();
         let vt = vt100::Parser::default();
         let screen = vt.screen().clone();
@@ -174,7 +176,7 @@ impl State {
                 Done,
             }
 
-            let _pts = pts;
+            let _pts = pts_clone;
 
             let mut stream: futures::stream::SelectAll<_> = [
                 tokio_util::io::ReaderStream::new(pty_r)

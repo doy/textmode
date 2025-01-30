@@ -1,4 +1,7 @@
-use std::io::{BufRead as _, Read as _};
+use std::{
+    io::{BufRead as _, Read as _},
+    os::fd::AsFd as _,
+};
 
 pub struct Fixture {
     name: String,
@@ -65,12 +68,12 @@ impl BuiltFixture {
         args: &[&str],
         f: F,
     ) {
-        let mut pty = pty_process::blocking::Pty::new().unwrap();
-        let pts = pty.pts().unwrap();
+        let (mut pty, pts) = pty_process::blocking::open().unwrap();
+        let _pts_clone = pts.as_fd().try_clone_to_owned().unwrap();
         pty.resize(pty_process::Size::new(24, 80)).unwrap();
-        let mut cmd = pty_process::blocking::Command::new(self.run.path());
-        cmd.args(args);
-        let mut child = cmd.spawn(&pts).unwrap();
+        let cmd =
+            pty_process::blocking::Command::new(self.run.path()).args(args);
+        let mut child = cmd.spawn(pts).unwrap();
 
         if self.screenguard {
             assert!(read_ready(&pty));
