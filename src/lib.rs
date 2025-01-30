@@ -55,10 +55,10 @@
 //! # }
 //! ```
 //!
-//! This module is split into two main parts: [`Output`](Output) and
-//! [`Input`](Input). See the documentation for those types for more details.
-//! Additionally, the [`blocking`] module provides an equivalent interface
-//! with blocking calls instead of async.
+//! This module is split into two main parts: [`Output`] and [`Input`]. See
+//! the documentation for those types for more details. Additionally, the
+//! [`blocking`] module provides an equivalent interface with blocking calls
+//! instead of async.
 
 #![warn(clippy::cargo)]
 #![warn(clippy::pedantic)]
