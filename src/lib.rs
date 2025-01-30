@@ -9,7 +9,7 @@
 //! use textmode::Textmode;
 //! # #[cfg(feature = "async")]
 //! # #[tokio::main]
-//! # fn main() -> textmode::Result<()> {
+//! # async fn main() -> textmode::Result<()> {
 //! let mut tm = textmode::Output::new().await?;
 //! tm.clear();
 //! tm.move_to(5, 5);
@@ -36,11 +36,8 @@
 //! ```no_run
 //! # use textmode::Textmode;
 //! # #[cfg(feature = "async")]
-//! # fn main() -> textmode::Result<()> {
-//! #     futures_lite::future::block_on(async { run().await })
-//! # }
-//! # #[cfg(feature = "async")]
-//! # async fn run() -> textmode::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> textmode::Result<()> {
 //! # let mut tm = textmode::Output::new().await?;
 //! tm.write(b"\x1b[34m\x1b[3;9Hbar\x1b[m");
 //! tm.refresh().await?;
